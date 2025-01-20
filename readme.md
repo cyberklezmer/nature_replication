@@ -1,6 +1,6 @@
-dataNature.xlsx
-objektivitaAV\ (1).xls
-objektivitaJU\ (1).xls
-objektivitaMU\ (1).xls
-objektivitaUK\ (1).xls
+dataNature.xlsx - data by Baker
+objektivitaAV\ (1).xls - CAS
+objektivitaJU\ (1).xls - SBU
+objektivitaMU\ (1).xls - MU
+objektivitaUK\ (1).xls - UK
 Reproducibility\ Survey\ Raw\ Data_2021-11-29\ -\ DATA\ BAKER.xlsx
