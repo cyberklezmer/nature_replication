@@ -1,0 +1,1198 @@
+---
+title: "Pro Petra Jedličku"
+author: "František Kalvas"
+date: "`r format(Sys.time(), '%d. %m. %Y')`"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+    code_folding: hide
+  word_document:
+    toc: yes
+    toc_depth: '2'
+---
+
+```{r Hlavička, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+####  Zpracování a příprava dat na analýzu o objektivitě přírodních věd  ####
+####  společná práce s Petrem Jedličkou
+
+## Úkoly: 
+#  1) načíst data,
+#  2) upravit data pro analýzu
+#  3) nějak stručně charakterizovat dat (počty případů dle pracoviště atd.),
+#     aby to šlo zkontrolovat
+
+## vytvořil: 2020-07-21 FrK
+## Upravil:  2022-01-18 FrK
+## Znaková sada/Charset: UTF-8
+
+PetruvEmail = 'Ciao,
+
+ 
+
+Posílám stručně, jak jsme o tom mluvili :
+
+ 
+
+K datům:
+
+ 
+
+u jednotlivých dotazníků (tedy v různých institucích) se liší otázka, protože mají různé klasifikace:  47. 44. Do jaké kategorie dle klasifikace akademie věd patřím?
+Čili budeme muset vymyslet co s tím…
+
+ 
+
+kontrola dat:
+-otázka 2 (hlavní obor) musí odpovídat zařažení v otázce - 55. 50. Jaká je moje hlavní specializace (oblast výzkumu)? (Anglicky)
+
+ 
+
+Na co se zaměřit:
+
+ 
+
+23. 22. Bavím se někdy s dalšími vědci explicitně o pojmu „objektivita“?
+- souvislost s obory, činnostmi (čili otázka 52/48), případně aplikovaný/základní (49/45), exaktnost (53), charakter oboru (50/46) a vdělání+kariéra atd. + existuje krize replikovatelnosti (6)
+
+ 
+
+22. 21. Jak chápu objektivitu? Co mi NEJVÍCE asociuje pojem vědecká objektivita?
+Obdobně analyza - souvislost s obory, činnostmi (52/48), případně aplikovaný/základní (49/45), exaktnost (53), charakter oboru (50/46)
+a vdělání+kariéra atd.
+ 
+
+problém financování – čili otázky 26-31
+ 
+
+znovu projet dilemata
+ 
+
+„čínský syndrom“
+ 
+
+Zdraví,
+
+Petr
+
+Co dodělat:
+1) CS klasifikace vedy (6 kat.) X 11 dimenzí objektivity (ANO/NE) ==> frekvence, % (N=1021)
+2) pohlaví, věk ==> frekvence, % (N=1021)
+3) CS klasifikace vedy (6 kat.) X 6 Hackingových stylů (ANO/NE) ==> frekvence, % (N=1021)
+
+'
+```
+
+
+# Příprava
+
+Vyčistíme paměť, poznamenáme si, kde je pracovní adresář a načteme potřebné package.  
+
+```{r Příprava, message=FALSE}
+## Vyčištění paměti
+rm(list=ls())
+dir = getwd()
+
+## Packages
+#library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(readxl)  # Načítání excelovských souborů
+library(gsheet)  # Načítání rovnou z Google Drive
+library(lubridate)  # Úprava datumů
+library(stringr)  # Práce se stringy
+library(lazyeval)  # Makro-programování
+library(rlang)  # Konstrukce příkazů
+library(mclust)  # Klastrová analýza
+library(ggplot2)  # Fajnové grafy :)
+```
+
+
+# Načtení dat
+
+Petr mi polal data jako `*.xls`, tedy jako zdrojové excelovské soubory. Načteme je z pracovního adresáře. Konec konců, ty data se nebudou měnit, takže to není problém jednou stáhnout ručně. Pojďme to načíst!   
+
+```{r Načtení dat z pracovního adresáře, message=FALSE}
+av = read_xls('objektivitaAV.xls')
+uk = read_xls('objektivitaUK.xls')
+ju = read_xls('objektivitaJU.xls')
+mu = read_xls('objektivitaMU.xls')
+
+tail(av[,1:4])  # Rychlý přehled AV ČR
+tail(uk[,1:4])  # Rychlý přehled UK
+tail(ju[,1:4])  # Rychlý přehled JČU
+tail(mu[,1:4])  # Rychlý přehled MU
+```
+
+Každopádně je cíl - načíst jeden soubor do jednoho `data.frame` - je splněn! 
+
+
+# Příprava dat
+
+Cílem je udělat v každém `data.frame` nový znak/proměnnou s názvem pracoviště (AV, MU, UK, JCU), zkontrolovat, že mají objekty stejný počet proměnných, a pak je spojit do jednoho `data.frame`. A další úpravy provedu už na jednom datovém objektu.  
+
+První, co bylo vidět, `AV` měla 161 proměnných a ostaní 162. Zjistil jsem, kde byl rozdíl - v ostatních souborech je navíc proměnná `45. Jaký je podíl vědecké činnosti na mojí celkové pracovní činnosti? (Uveďte svůj odhad) - Podíl vědecké činnosti`. Tu jsem do `AV` doplnil a přečísloval všechny následující proměnné.  
+
+Teď jde o dvě věci, které je třeba udělat, aby se dala data bez problémů spojit:  
+
+  1. Vymyslet způsob, jak sjednotit kategorie seniority/ vědecké hodnosti napříč pracovišti  
+  2. Vymyslet jednotné kratší názvy pro všechny proměnné  
+  
+Sjednocení hodností musíme vymyslet s Petrem, teď se pustíme do jednodušší práce - označíme si instituci, ze které jsou data.
+
+```{r Ze které instituce pochází datový řádek?}
+# AV ČR
+av$inst = 'AV'
+
+# UK 
+uk$inst = 'UK'
+
+# JČU
+ju$inst = 'JU'
+
+# MU
+mu$inst = 'MU'
+```
+
+Byla by to zbytečná práce navíc to naprudko spojit s nejednotnými názvy a pak to v rámci souboru 'přelévat'. Raději to přejmenujeme jednotně a pak to spojíme znovu.  
+
+```{r Spojení souborů s jednotnými názvy proměnných}
+# EDIT: 2023-03-06:
+# Abych se v tom později vyznal, tak si potřebuju uložit alespoň vektor se starými názvy proměnných,
+# resp. vektor s texty otázek. Problém je, že se někde názvy malinko změnily, 
+# takže byť je v původních souborech 163 proměnných, když to sloučím, dostanu 173 názvů,
+# tedy 10 je navíc. No, jde jen o texty, alespoň orientačně, takže nemá cenu na čárku harmonizovat vše.
+# Brutálně tedy sloučím všechny čtyři zdroje do sebe, vytáhnu vektor názvů/ otázek a ten si uložím.
+# Až s tím budu pracovat, tak už si to nějak namapuju!
+old_names = bind_rows(av, uk, ju, mu) %>% names()
+# BACHA! Těsně než uložím kompletní data, tak vymažu 5. a 7. proměnnou, 
+# proto tyhle dv2 pozice mus9m vymazat i tady, aby v tom nebyl bordel. 
+old_names = old_names[c(1:4, 6, 8:length(old_names))]  
+old_names[161] = "Instituce (AV/JČU/MU/UK)"  # Je to zprasené... ručně upravím název na informativnější...
+
+# Nové názvy proměnných:
+j = c('poradi', 'ID', 'datum', 'cas_sec', 'NA', 'misto_vyzkumu', '_jine', 
+      'obor', 'zakl_vyzkum', 'reproduk', 
+      'rep_Ne', 'rep_Mainstream', 'rep_Casopisy', 'rep_Diskuse', 'rep_Vlastni', 
+      'krize_rep', 'krize_fyz', 'krize_bio', 'krize_med', 'krize_soc', 'krize_nevim',
+      'rep_podil', 'nerep_problem', 'nerep_chyba', 'nerep_valid', 'nerep_neobj', 'nerep_veda',
+      'nerep_narust', 'reg_Evropa', 'reg_Sev.Amerika', 'reg_Asie', 'reg_vsude.stejne', 'reg_nevim', 'nerep_zeme',
+      'despekt', 'desp_zeme', 'desp_jazyk', 'desp_kvalita', 'desp_nevim', 'desp_vlastni',
+      'reakce_nectu', 'reakce_vyberu', 'reakce_obezret', 'reakce_nic', 'reakce_stejne', 
+      'reakce_nevim', 'reakce_vlastni', 
+      'fakt_podvod', 'fakt_karier', 'fakt_dohled', 'fakt_recenz', 'fakt_selekc', 
+      'fakt_replik', 'fakt_statis', 'fakt_odborn', 'fakt_data', 'fakt_dokume', 
+      'fakt_metody', 'fakt_variab', 'fakt_design', 'fakt_smula', 'fakt_dalsi',
+      'nerep_jaMuj', 'nerep_jaCizi', 'nerep_oniMuj', 'rep_komentar',
+      'objekt_vnejsi.pohled', 'objekt_presnost', 'objekt_matematicka.konzistence', 
+      'objekt_testovatelnost', 
+      'objekt_nestrannost', 'objekt_priblizeni.pravde', 'objekt_shoda.s.realitou', 
+      'objekt_kvantifikace', 
+      'objekt_intersubjektivita', 'objekt_kriticke.mysleni', 'objekt_reprodukovatelnost',
+      'objekt_diskut',
+      'frek_nerepre', 'frek_hacking', 'frek_positiv', 'frek_popular',
+      'frek_modmet', 'frek_oversell', 'frek_zbytecne', 'frek_salam', 
+      'neobj_nerepre', 'neobj_hacking', 'neobj_positiv', 'neobj_popular',
+      'neobj_modmet', 'neobj_oversell', 'neobj_zbytecne', 'neobj_salam', 
+      'financ_vliv', 'financ_zajisti.objektivitu', 'financ_neduvera', 'financ_zajisti.nezavislost',
+      'financ_casvliv', 'financ_casvlast', 'pomer_administr',
+      'diskrim_muzi', 'diskrim_starsi', 'diskrim_uspesni',
+      'diskrim_autority', 'diskrim_zavedene', 'objekt_komentar',
+      'dilema_predator', 'dilema_neinformoval', 'dilema_misogyn', 'dilema_kvoty',
+      'dilema_cinska.medicina', 'dilema_embryo', 'dilema_komentar',
+      'gender', 'vek', 
+      'kar_praxe', 'kar_titul', 'kar_citace', 'kar_nejlepsi', 'kar_kategorie', 'kar_komentar', 
+      'pomer_veda', 'pomer_zakladni',
+      'obor_dotovany', 'obor_konkuren', 'obor_tlak', 'obor_rychly', 'obor_priliv',
+      'obor_publikac', 'obor_medializ', 'obor_verejnos', 'obor_komplexn', 'obor_mensi',
+      'cinnost_matem', 'cinnost_model', 'cinnost_teori', 'cinnost_exper',
+      'cinnost_kateg', 'cinnost_vyvoj', 'obor_ekzaktnost', 'obor_komentar',
+      'spec_hlavni', 'spec_astr', 'spec_astrvl', 'spec_bio', 'spec_biovl', 
+      'spec_chem', 'spec_chemvl', 'spec_ekol', 'spec_ekolvl', 'spec_inze', 'spec_inzevl',
+      'spec_matr', 'spec_matrvl', 'spec_medi', 'spec_medivl', 'spec_fyzi', 'spec_fyzivl',
+      'spec_matm', 'spec_metmvl', 'spec_vlastni', 'instituce')
+
+# A teď to aplikuju na všechny 4 data.framy, ale taky si zkusím uložit staré názvy:
+for (i in c('av', 'uk', 'ju', 'mu')) {
+  assign(paste0('zj', i), names(get(i)))
+  assign(i, setNames(get(i), j))  # Krátká verze předchozích 3 řádek, které nechám jako memento v poznámce!
+}
+
+# Konečně to můžeme spojit...
+all = bind_rows(av, uk, ju, mu)
+glimpse(all)  
+```
+
+Tak teď to opravdu funguje jak cyp! Je to sjednocené a můžu se pustit do další práce, do čištění dat.  
+
+
+
+# Čištění dat
+
+Proti čemu stojíme víme z `glipse(all)` a `glimpse(allg)`, teď se postupně pustíme do čištění a pomocí `glimpse()` na jeho konci budeme monitorovat průběžný výsledek. Všechny proměnné převedeme na faktory (krom frekvence nekalých praktik, ty změníme na číselné), zrekódujeme a zjednoduššíme názvy kategorií.  
+
+
+```{r Čištění souboru I.}
+## Převádění typů datumů mezi sebou
+library(lubridate)
+
+# Vyčištění datumu a odmazání případů před 2019-04-11 a zbytečných proměnných
+all$datum = as.Date(all$datum) 
+all = all[all$datum >= as.Date("2019-04-11"), c(1:4, 6, 8:163)]
+data = all
+
+# EDIT 2023-03-06: Musím si k datům přiložit původní staré názvy/texty otázek.
+save(data, old_names, file = "dataAll.RData")
+```
+   
+```{r Čištění souboru II.}
+# Abych se někam dostal, vyčistím si vždy jenom data, která budu potřebovat, 
+# pak to poskládám, zjistím, kde jsou prázdná místa a ta doplním.
+data = all %>%
+  #filter(Species %in% c("setosa", "virginica"), Sepal.Length>5) %>%
+  select(instituce, obor, spec_hlavni, zakl_vyzkum, # Tady definuji, co chci: identifikace pracoviště a oboru
+         obor_ekzaktnost,  # Ekzaktnost oboru
+         krize_rep,  # Existuje krize reprodukovatelnosti?
+         #nerep_zeme,  # Čínský syndrom no. 1 - dělá to neplechu... pryč od toho!
+         starts_with(c('cinnost_',  # hlavní činnosti 
+                       'kar_',  # charakteristiky kariéry
+                       'obor_',  # charakteristiky oboru
+                       'financ_',  # vliv financování výzkumu
+                       'dilema_',  # etická dilemata
+                       'reg_',  # Čínský syndrom no. 2
+                       'objekt_',  # vnímání objektivity
+                       'neobj_',  # co narušuje objektivitu
+                       'frek_')),  # frekvence narušení objektivity
+         -objekt_komentar, -kar_komentar, -obor_komentar, -dilema_komentar,
+         -financ_casvliv, -financ_casvlast, -reg_nevim)  %>%  # Tady definuji, čeho se chci zbavit...
+  mutate_at(vars(starts_with(c('frek_', 'objekt_', 'reg_', 'financ_', 'cinnost_', 'krize_'))),  # Vše rekóduji najednou příkazem
+            ~recode(., `Nikdy 0%` = '0', `Vždy 100%` = '100',  # Frekvence narušení objektivity   
+                     `10%` = '10', `20%` = '20', `30%` = '30', `40%` = '40', `50%` = '50',
+                     `60%` = '60', `70%` = '70', `80%` = '80', `90%` = '90',
+                     `Pohled z vnějšku` = 'Ano', `Přesnost` = 'Ano',  `Matematická konzistence` = 'Ano',  # Objektivita
+                     `Testovatelnost` = 'Ano', `Nestrannost` = 'Ano', `Přiblížení k pravdě` = 'Ano',
+                     `Shoda s realitou` = 'Ano', `Kvantifikace` = 'Ano', `Kritické myšlení` = 'Ano', 
+                     `Reprodukovatelnost` = 'Ano', 
+                     `Intersubjektivita (možnost sdílet vědecké výsledky s ostatními)` = 'Ano',
+                     `Evropa` = 'Ano', `Severní Amerika` = 'Ano',  `Asie` = 'Ano',  # Region
+                     `Ve všech regionech je podíl nereprodukovatelných studií stejný` = 'Ano',  
+                     `Soukromé (korporátní)` = 'Soukromé',  # Financování 
+                     `Státní nebo nadnárodní (státní nebo evropské instituce, grantové agentury apod.)` = 'Veřejné',
+                     `Financovaných z veřejných zdrojů` = 'Veřejné', 
+                     `Ne, obojí je stejně důvěryhodné` = 'Nehraje roli',
+                     `Financovaných ze soukromých zdrojů` = 'Soukromé',
+                     `1. místo` = 'Ano', `2. místo` = 'Ne',  `3. místo` = 'Ne',  # Činnost
+                     `Tuto činnost nedělám` = 'Ne', 
+                     `Ano, nevýznamná krize` = 'Nevýznamná', # Krize reprodukovatelnosti 
+                     `Ano, významná krize` = 'Významná', `Ne, žádná krize není` = 'Není')) %>%
+  mutate_at(vars(starts_with(c('frek_'))), ~as.integer(.)) %>% 
+  mutate_at(vars(starts_with(c('reg_', 'financ_', 'cinnost_'))), list(~replace_na(., 'Ne'))) %>%
+  mutate_at(vars(objekt_vnejsi.pohled:objekt_reprodukovatelnost), list(~replace_na(., 'Ne'))) %>% 
+  mutate_at(vars(obor),  # Rekod oborů, aby byly jednotné
+            ~recode(., `Sekce aplikované fyziky` = 'Apl. fyzika', 
+                    `Aplikovaná fyzika` = 'Apl. fyzika', 
+                    `Sekce biologických a lékařských věd` = 'Biol-Medic',
+                    `Biologické a lékařské vědy` = 'Biol-Medic',
+                    `Sekce biologicko-ekologických věd` = 'Biol-Ekol', 
+                    `Biologicko-ekologické vědy` = 'Biol-Ekol',
+                    `Sekce chemických věd` = 'Chemie',
+                    `Chemické vědy` = 'Chemie',
+                    `Sekce matematiky, fyziky a informatiky` = 'Mat-Fyz-Info', 
+                    `Matematika, fyzika a informatika` = 'Mat-Fyz-Info', 
+                    `Sekce věd o Zemi` = 'Vědy o Zemi')) %>% 
+  mutate_at(vars(spec_hlavni),  # Rekod specializace, aby byly kratší
+            ~recode(., `Astronomy and Planetary Science` = 'Other',  # Je tam jen 8 lidí, slučujeme do 'Other'
+                    `Earth and Environmental Science` = 'Earth-Env', 
+                    `Engineering` = 'Other',  # Je tam jen 16 lidí, slučujeme do 'Other'
+                    `Materials Science` = 'Materials',
+                    `Mathematics` = 'Math.', 
+                    `Other specialization` = 'Other')) %>% 
+  mutate_at(vars(!starts_with(c('frek_'))), 
+            list(~factor(., exclude = c("Nevím", "Tuto činnost nedělám", "Nedokážu posoudit", "NA", NA)))) 
+
+  levels(data$obor_ekzaktnost) = c('Menší', 'Větší') 
+
+# Výsledek:
+glimpse(data)
+
+save(data, file = "dataProcessed.RData")
+```
+
+Tak a je to vyčištěné! Resp. vše co zatím Petr potřebuje.  
+
+
+# Výsledky  
+
+Výsledky jsou prezentované trochu zvláštně. Je to kvůli tomu, že jejich pořadí podřizuji svému komfortu - abych nemusel pořád přecházet až na konec, hodí se mi každou novou část udělat hned po té, co jsou připravená data, aby 'projetí' celého kódu nezdržovalo. Report je zpracovaný tak, že každá část má svůj nadpis a v menu se dá rychle najít část analýzy, která čtenáře zajímá.    
+
+
+## Petrovo zadání pro jiné úlohy než je objektivita  
+  
+> u jednotlivých dotazníků (tedy v různých institucích) se liší otázka, protože mají různé klasifikace:  47. 44. Do jaké kategorie dle klasifikace akademie věd patřím? Čili budeme muset vymyslet co s tím…   
+> kontrola dat: -otázka 2 (hlavní obor) musí odpovídat zařažení v otázce - 55. 50. Jaká je moje hlavní specializace (oblast výzkumu)? (Anglicky)  
+
+. . . . HOTOVO!  
+
+> problém financování – čili otázky 26-31   
+
+FrK: Nevím tady... Co s tím? Přehled proměnných je hotový, jestli jde o nějaké souvislosti, tak nevím, co by mělo ovlivňovat úvahy o financích, resp., nechce se mi mechanicky brát vše a korelovat to s názorem na finance... 
+ 
+> znovu projet dilemata  
+> „čínský syndrom“  
+ 
+FrK: Dilematům rozumím, vím i co má být 'Čínský syndrom' (že se jinak přistupuje k vědě z Číny, resp. Asie), ale nevím, jestli stačí jen pouhé frekvence - ty jsou hotové - nebo je třeba testovat vztahy - pak nevím jaké vztahy to mají být.  
+
+
+## Funkce potřebné pro generování tabulek  
+
+Na doplňování hvězdiček k p-hodnotě si napíšeme funkci `pHod()`.
+
+```{r funkce na úpravu p-hodnoty}
+pHod = function(x) {
+  if (x < 0.1) {
+    if (x < 0.05) {
+      if (x < 0.01) {
+        if (x < 0.001) {
+          x = '<0.001 ***'
+        } else {
+          x = paste0(x, ' **')
+        }
+      } else {
+        x = paste0(x, ' *')
+      }
+    } else {
+      x = paste0(x, ' +')
+    }
+  }
+  return(x)
+}
+
+```
+
+Podobně si napíšeme funkci `vnimani.objektivity()` na vypisování tabulky s vnímáním 11 dimenzí objektivity a `diskuse.objektivita()` na diskuse o objektivitě. Jako důležitá pomocná je funkce `run.text()`, která zajístí, aby string byl převeden na kód a ten i realizován.  
+
+```{r funkce na tvorbu tabulek vnímání objektivity a diskusí o ní}
+# Nebude to úplně nejlepší funkce, jen něco, co bude fungovat tady, 
+# při převzetí jinam, je třeba dát bacha, v jakém objektu jsou data.
+# Ale možná to zkusím vyčistit...
+run.text = function(text) {
+  str2lang(text) %>% eval(envir = .GlobalEnv)  # klíčové je 'envir = .GlobalEnv'
+}
+
+obj.vse = function(soubor = data){  # Napíšeme si ještě funkci, která kdykoli vytvoří vektor s vnímáním objektivity celého souboru
+  df = select(soubor, starts_with('objekt_'), -objekt_diskut)
+  podily = c(1:11)
+  for (i in 1:11) {
+    radek = table(df[,i]) %>% prop.table() %>% round(3)
+    podily[i] = 100 * radek[1]
+  }
+  podily
+}
+
+vnimani.objektivity = function(promenna = "krize_rep"){
+  # Příprava dat, popisků atd. pro zpracování tabulky
+  ## Vytvoření objektu 'df' s vyselektovanými daty 
+  paste0("soubor = select(data, starts_with('objekt_'), ", promenna, ")") %>% run.text()
+
+  ## Vytvoření objektu 'kat' s kategoriemi nezávisle proměnné
+  paste0("kat = levels(soubor$", promenna,")") %>% run.text()
+  
+  ## Vytvoření objektu 'pok' s četnostmi kategorí nezávisle proměnné
+  paste0("abs.cet = table(soubor$", promenna,")") %>% run.text()
+  
+  ## Dokončení úvodního nastavení
+  prom = names(soubor)
+  k = length(kat)
+  vysledky = matrix(data = 1:(11 * k), nrow = 11, ncol = k)
+  p.hodnota = c(1:11)  # vektor pro uložení p-hodnot
+  row.names(vysledky) = prom[1:11]
+  colnames(vysledky) = kat[1:k]
+
+  # Samotný výpočet pomocí cyklu
+  for (i in 1:11) {
+    x = table(soubor[, c(i, 13)])
+    a = x  %>% prop.table(2) %>% round(3)
+    vysledky[i,] = a[1,] * 100 
+    p.hodnota[i] = chisq.test(x)$p.value %>% round(3) %>% pHod()
+  }
+
+  # Změříme Euklidovskou vzdálenost výsledků:
+  print(paste0("Eukleidovská vzdálenost kategorií '", promenna, "':"))
+  t(vysledky[, c(1:k)]) %>% rbind(celek = obj.vse(), .) %>% dist() %>% round(2) %>% print()
+  print(" ")
+  
+  # Uděláme tabulku:
+  print(paste0("Vnímání objektivity dle kategorií '", promenna, "':"))
+  dx = data.frame(celek = obj.vse(), vysledky, p.hodnota) %>% 
+    rbind(., c(sum(abs.cet), abs.cet, ""))
+  row.names(dx)[12] = "Abs. počty:"
+  print(dx)  # Připojení p-hodnot
+}
+
+vnimani.objektivity.obj = function(promenna = "krize_rep"){
+  # Příprava dat, popisků atd. pro zpracování tabulky
+  ## Vytvoření objektu 'df' s vyselektovanými daty 
+  run.text("soubor = select(data, starts_with('objekt_'))")
+
+  ## Vytvoření objektu 'kat' s kategoriemi nezávisle proměnné
+  paste0("kat = levels(soubor$", promenna,")") %>% run.text()
+  
+  ## Vytvoření objektu 'pok' s četnostmi kategorí nezávisle proměnné
+  paste0("abs.cet = table(soubor$", promenna,")") %>% run.text()
+  
+  ## Dokončení úvodního nastavení
+  prom = names(soubor)
+  poz = match(promenna, promenne)  # Pozice proměnné v soupise promenných
+  k = length(kat)
+  vysledky = matrix(data = 1:(11 * k), nrow = 11, ncol = k)
+  p.hodnota = c(1:11)  # vektor pro uložení p-hodnot
+  row.names(vysledky) = prom[1:11]
+  colnames(vysledky) = kat[1:k]
+
+  # Samotný výpočet pomocí cyklu
+  for (i in 1:11) {
+    x = table(soubor[, c(i, poz)])
+    a = x  %>% prop.table(2) %>% round(3)
+    vysledky[i,] = a[1,] * 100 
+    p.hodnota[i] = chisq.test(x)$p.value %>% round(3) %>% pHod()
+  }
+
+  # Změříme Euklidovskou vzdálenost výsledků:
+  # print(paste0("Eukleidovská vzdálenost kategorií '", promenna, "':"))
+  # t(vysledky[, c(1:k)]) %>% rbind(celek = obj.vse(), .) %>% dist() %>% round(2) %>% print()
+  # print(" ")
+  
+  # Uděláme tabulku:
+  print(paste0("Vnímání objektivity dle kategorií '", promenna, "':"))
+  dx = data.frame(celek = obj.vse(), vysledky, p.hodnota) %>% 
+    rbind(., c(sum(abs.cet), abs.cet, ""))
+  row.names(dx)[12] = "Abs. počty:"
+  print(dx)  # Připojení p-hodnot
+}
+
+
+
+disk.vse = function(soubor = data){  # Napíšeme si ještě funkci, která kdykoli vytvoří vektor s diskusí objektivity celého souboru
+  df = select(soubor, objekt_diskut)
+  radek = table(df) %>% prop.table() %>% round(3)
+  (100 * radek)
+}
+
+diskuse.objektivita = function(promenna = "obor") {
+  ## Příprava
+  paste0("soubor = select(data, objekt_diskut, ", promenna, ")") %>% run.text()
+  paste0("abs.cet = table(soubor$", promenna,")") %>% run.text()
+
+  # Výpočet a ladění výstupu
+  x = table(soubor) 
+  a = x  %>% prop.table(2) %>% round(3)
+  dx = as.matrix(a * 100) %>% cbind(celek = disk.vse(), .) %>% 
+    rbind(., "Abs. počty:" = c(sum(abs.cet), abs.cet))
+
+  ## Výpis výsledků:
+  # Euklidovská distance řádků tabulky
+  print(paste0("Eukleidovská vzdálenost kategorií '", promenna, "':"))
+  t(a * 100) %>%  rbind(celek = disk.vse(), .) %>% dist() %>% round(2) %>% print()
+  print(" ")
+  
+  # Tabulka diskusí
+  print(paste0("Diskuse o objektivitě dle kategorií '", promenna, "':"))
+  print(dx)
+  chisq.test(x)  %>% print()# Máme jedinou tabulku, nemá cenu to z toho vytahovat...
+}
+```
+
+
+
+## Zadání od Petra pro objektivitu  
+
+Kopie Petrova zadání:  
+
+> 23. 22. Bavím se někdy s dalšími vědci explicitně o pojmu „objektivita“?  
+> - souvislost s obory, činnostmi (čili otázka 52/48), případně aplikovaný/základní (49/45), exaktnost (53), charakter oboru (50/46) a vdělání+kariéra atd. + existuje krize replikovatelnosti (6)  
+>
+> 22. 21. Jak chápu objektivitu? Co mi NEJVÍCE asociuje pojem vědecká objektivita?  
+Obdobně analyza - souvislost s obory, činnostmi (52/48), případně aplikovaný/základní (49/45), exaktnost (53), charakter oboru (50/46) a vdělání+kariéra atd.  
+
+. . . . . . . . . . . . . . . . HOTOVO!  
+
+
+Telefonát:  
+  
+> Můžeme zkusit sloučit `obory`  
+  
+. . . . . . . . . . . . . . . Provedeno!  
+  
+> Graf pro prezentaci Eukleidovských vzdáleností - spočítat jeden vektor pro celý soubor a v grafu pak prezentovat eukleidovskou vzdálenost srovnávaných poskupin od celého souboru  
+
+. . . . . . . . . . . . . . . HOTOVO! Je to spočítané, jen to dát do grafu...  
+     
+> Další nápady na ovlivňující proměnné:  
+> - Instituce (AV, UK, JČU, MU)  
+> - Obory  
+> - Hlavní specializace  
+> - Finance  
+>  
+
+. . . . . . . . . . . . . . . HOTOVO!  
+
+> Další nápady:  
+> - faktorová analýza dimenzí objektivity  
+> - vzájemná korelace dimenzí objektivity  
+>  
+
+# Vzájemný vztah dimenzí objektivity
+
+## Tabulky
+
+V následujících tabulkách vidíme, jak často uvedli respondenti některou z jedenácti charakteristik objektivity, když uvedl nebo neuvedl jednu vybranou charakteristiku objektivity (ergo, alespoň v jednom políčku sloupce 'Ano' musí být 100 %, stejně jako v jednom políčku sloupce 'Ne' musí být 0 % a obě políčka jsou na řádku, který odpovídá příslušné charakteristice).  
+
+```{r Tabulky dimenzí objektivity}
+promenne = c('objekt_vnejsi.pohled', 'objekt_presnost', 'objekt_matematicka.konzistence', 
+      'objekt_testovatelnost', 'objekt_nestrannost', 'objekt_priblizeni.pravde', 'objekt_shoda.s.realitou', 
+      'objekt_kvantifikace', 'objekt_intersubjektivita', 'objekt_kriticke.mysleni', 'objekt_reprodukovatelnost',
+      'objekt_diskut')
+for (i in c('objekt_vnejsi.pohled', 'objekt_presnost', 'objekt_matematicka.konzistence', 
+      'objekt_testovatelnost', 'objekt_nestrannost', 'objekt_priblizeni.pravde', 'objekt_shoda.s.realitou', 
+      'objekt_kvantifikace', 'objekt_intersubjektivita', 'objekt_kriticke.mysleni', 'objekt_reprodukovatelnost',
+      'objekt_diskut')) {
+  vnimani.objektivity.obj(i)
+}
+```
+
+## Korelace 
+
+```{r Korelace}
+library(ggcorrplot)
+library(corrgram)
+library(ggstatsplot)
+library(corrr)
+
+# Selekce  a příprava dat
+soubor = select(data, starts_with('objekt_'), -objekt_diskut, starts_with('cinnost_')) %>% 
+  mutate_all(~recode(., `Ne` = '0', `Ano` = '1')) %>% 
+  mutate_all(~as.character(.)) %>% 
+  mutate_all(~as.integer(.))
+names(soubor) = c('External view', 'Accuracy', 'Math. consistency', 'Testability',
+                  'Impartiality', 'Closeness to the truth', 'Correspondence with reality',
+                  'Quantification', 'Intersubjectivity', 'Critical thinking', 'Reproducibility',
+                  'Mathematic', 'Modeling', 'Theory', 'Experiment', 'Category', 'Tools')
+
+# Korelace
+kor  = soubor %>% cor(method = "spearman") %>% round(2)
+kor
+
+# Korelogram
+ggcorrplot(kor, method = 'circle', hc.order = TRUE, type ='lower', 
+           show.diag = FALSE, ggtheme = theme_light(), lab = TRUE, lab_size = 3,
+           colors = c("red", "white", "darkgreen"), digits = 1)
+
+corrgram(kor, order="HC", lower.panel = NULL, upper.panel=panel.pie,
+         col.regions=colorRampPalette(c("red", "white", "darkgreen")))
+
+network_plot((2 * kor), min_cor = 0.2, colours = c("red", "white", "darkgreen"))
+
+```
+
+Nic moc s ničím výrazně nekoreluje. Spíše jsou orelace negativní, tedy uvedu-li příslušnou charakteristiku, neuvedu spíš druhou.
+
+
+## Faktorová analýza  
+```{r Faktorová analýza}
+# Selekce  a příprava dat
+soubor = select(data, starts_with('objekt_'), -objekt_diskut) %>% 
+  mutate_at(vars(starts_with('objekt_')),  
+            ~recode(., `Ne` = '0', `Ano` = '1')) %>% 
+  mutate_at(vars(starts_with('objekt_')),  
+            ~as.character(.)) %>% 
+  mutate_at(vars(starts_with('objekt_')),  
+            ~as.integer(.))
+
+# Větší smysl má dělat to jen metodou hlavních komponent:
+# soubor %>% factanal(factors = 6, rotation = "varimax")
+print('Škálované řešení')
+skalovano = soubor %>% prcomp(scale. = TRUE) 
+skalovano
+skalovano %>% summary()
+# skalovano %>% plot()
+
+print('Neškálované řešení')
+neskalovano = soubor %>% prcomp(scale. = FALSE)
+neskalovano
+neskalovano %>% summary()
+# neskalovano %>% plot()
+```
+
+Vida! Metoda hlavních komponent nám něco našla! Teď jen si musíme zvážit jestli raději škálované řešení nebo neškálované. Byl bych pro škálované, protože mi přijde zajímavější :) Ne... prostě jsou tam výraznější loadings, navíc, škálování se pro metodu hlavních komponent doporučuje. Ale ukazuji tady i to neškálované.  
+
+
+## Klastrová analýza  
+
+<!-- ```{r Klastrová analýza} -->
+<!-- df = select(data, starts_with('objekt_'), -objekt_diskut) %>% mutate_all(~as.integer(.))  -->
+<!-- bic = df %>% mclustBIC() -->
+<!-- plot(bic) -->
+<!-- cls = Mclust(df, x=bic, G=1:20) -->
+<!-- dr = cls %>% MclustDR(normalized = TRUE) -->
+<!-- summary(dr) -->
+<!-- plot(dr, what = "boundaries") -->
+<!-- cls[["z"]][,1] %>% hist(main = "Histogram pravdepodobnosti zařazení do prvního klastru") -->
+<!-- plot( dr[["dir"]][,1], cls[["z"]][,1],  -->
+<!--       main = "Kdo patří do prvního klastru, je v dimenzi 1 kolem 0", -->
+<!--       ylab = "0=nepatří (n=232), 1=patří (n=789) do prvního klastru", -->
+<!--       xlab = "Pozice v první dimenzi") -->
+<!-- plot( dr[["dir"]][,2], cls[["z"]][,1],  -->
+<!--       main = "Kdo patří do prvního klastru, je i v dimenzi 2 kolem 0", -->
+<!--       ylab = "0=nepatří (n=232), 1=patří (n=789) do prvního klastru", -->
+<!--       xlab = "Pozice v druhé dimenzi") -->
+<!-- plot( dr[["dir"]][,3], cls[["z"]][,1],  -->
+<!--       main = "Kdo patří do prvního klastru, je i v dimenzi 3 kolem 0", -->
+<!--       ylab = "0=nepatří (n=232), 1=patří (n=789) do prvního klastru", -->
+<!--       xlab = "Pozice ve třetí dimenzi") -->
+<!-- plot( dr[["dir"]][,4], cls[["z"]][,1],  -->
+<!--       main = "Kdo patří do prvního klastru, je i v dimenzi 4 kolem 0", -->
+<!--       ylab = "0=nepatří (n=232), 1=patří (n=789) do prvního klastru", -->
+<!--       xlab = "Pozice ve čtvrté dimenzi") -->
+
+<!-- # Ještě to zobrazíme pomocí boxplotů -->
+<!-- df = data.frame(klastr = dr[["classification"]], dr[["dir"]][,1:9]) %>% -->
+<!--   pivot_longer(2:10,  -->
+<!--                names_to = "Dimenze",  -->
+<!--                values_to = "Pozice na dimenzi") -->
+
+<!-- df %>%  -->
+<!--   ggplot(mapping = aes(fill = `klastr`,  -->
+<!--                        col = `klastr`, -->
+<!--                        y = `Pozice na dimenzi`,  -->
+<!--                        x = Dimenze)) + -->
+<!--   geom_boxplot(alpha = 0.15) +  -->
+<!--   geom_point(size = 2.5, alpha = 0.05,  -->
+<!--              position = position_jitterdodge(jitter.height = 0.005,  -->
+<!--                                              jitter.width = 0.35,)) + -->
+<!--   labs ( -->
+<!--     title = "Pozice respondentů na jednotlivých dimenzích odvozených redukcí dimenzí", -->
+<!--     subtitle = paste0("podle klastru. (N=", (nrow(df) / 9) ,")."), -->
+<!--     x = "", -->
+<!--     caption = "Zdá se mi, že 9. a 8. dimenze jsou úplně zbytečné (10. a 11. jsou úplně zbytečné, ani to neukazuju), \n 5.-7. dimenze rozlišují uvnitř prvního klastru, 4. odlišuje klastry od sebe, 1.-3. rozlišuje jen uvnitř druhého klastru." -->
+<!--   ) + -->
+<!--   scale_x_discrete(guide = guide_axis(n.dodge = 2)) + -->
+<!--   theme_classic() +  -->
+<!--   theme( -->
+<!--     legend.position = "bottom" -->
+<!--   ) -->
+
+<!-- ``` -->
+
+<!-- Zajímavé! Když jsem dal možnost až 110 klastrů, tak to vybralo jako nejlepší řešení 110 clusterů. Když jsem ale dal jako horní limit 20 klastrů, vybralo to jako nejlepší řešení 2 klastry. -->
+
+
+<!-- ```{r Klastrová analýza celkově} -->
+<!-- # obejektivita| + obory(6)| + obory(10/8)| + základní výzkum| +  -->
+<!-- # provádí experimenty + činnosti(6)| + ekzaktnost oboru| -->
+
+<!-- library(mclust) -->
+
+<!-- df = select(data, starts_with(c('cinnost_', 'objekt_')), obor:zakl_vyzkum, -objekt_diskut) %>% -->
+<!--   mutate_all(~as.integer(.)) -->
+<!-- bic = df %>% mclustBIC() -->
+<!-- plot(bic) -->
+<!-- summary(bic) -->
+<!-- cls = df %>% Mclust(x = bic, G=2:3) -->
+<!-- dr = cls %>% MclustDR(normalized = TRUE) -->
+<!-- summary(dr) -->
+<!-- plot(dr, what = "pairs") -->
+<!-- cls[["z"]][,1] %>% hist(main = "Histogram pravdepodobnosti zařazení do prvního klastru") -->
+<!-- cls[["z"]][,2] %>% hist(main = "Histogram pravdepodobnosti zařazení do druhého klastru") -->
+<!-- # cls[["z"]][,3] %>% hist(main = "Histogram pravdepodobnosti zařazení do třetího klastru") -->
+<!-- # cls[["z"]][,4] %>% hist(main = "Histogram pravdepodobnosti zařazení do čtvrtého klastru") -->
+
+<!-- # Ještě to zobrazíme pomocí boxplotů -->
+<!-- df = data.frame(klastr = dr[["classification"]], dr[["dir"]][,1:6]) %>% -->
+<!--   pivot_longer(2:7, -->
+<!--                names_to = "Dimenze", -->
+<!--                values_to = "Pozice na dimenzi") -->
+
+<!-- df %>% -->
+<!--   ggplot(mapping = aes(fill = `klastr`, -->
+<!--                        col = `klastr`, -->
+<!--                        y = `Pozice na dimenzi`, -->
+<!--                        x = Dimenze)) + -->
+<!--   geom_boxplot(alpha = 0.15) + -->
+<!--   geom_point(size = 2.5, alpha = 0.05, -->
+<!--              position = position_jitterdodge(jitter.height = 0.005, -->
+<!--                                              jitter.width = 0.35,)) + -->
+<!--   labs ( -->
+<!--     title = "Pozice respondentů na jednotlivých dimenzích odvozených redukcí dimenzí", -->
+<!--     subtitle = paste0("podle klastru. (N=", (nrow(df) / 6) ,")."), -->
+<!--     x = "", -->
+<!--     caption = "Zdá se mi, že 4., 5. a 6. dimenze jsou úplně zbytečné (7. až 20. jsou úplně zbytečné, ani to neukazuju), \n 1., 2. a 3. dimenze rozlišují uvnitř prvního klastru, ostatní klastry nejsou rozlišené, vůbec nechápu, proč to odhadlo zrovna je..." -->
+<!--   ) + -->
+<!--   scale_x_discrete(guide = guide_axis(n.dodge = 2)) + -->
+<!--   theme_classic() + -->
+<!--   theme( -->
+<!--     legend.position = "bottom" -->
+<!--   ) -->
+
+<!-- ``` -->
+
+
+
+# Další výsledky
+
+## Neobjektivita  
+
+### Vnímání objektivity
+
+```{r Neobjektivita vs. Objektivita - vnímání, warning=FALSE}
+for (i in c('neobj_nerepre', 'neobj_hacking', 'neobj_positiv', 'neobj_popular',
+            'neobj_modmet', 'neobj_oversell', 'neobj_zbytecne', 'neobj_salam')) {
+  vnimani.objektivity(i)
+}
+```
+
+### Diskuse o objektivitě
+
+```{r Neobjektivita vs. Objektivita - diskuse, warning=FALSE}
+for (i in c('neobj_nerepre', 'neobj_hacking', 'neobj_positiv', 'neobj_popular', 
+            'neobj_modmet', 'neobj_oversell', 'neobj_zbytecne', 'neobj_salam')) {
+  diskuse.objektivita(i)
+}
+```
+
+
+
+## Vlastnosti oboru  
+
+### Vnímání objektivity
+
+```{r Vlastnosti oboru vs. Objektivita - vnímání, warning=FALSE}
+for (i in c('obor_dotovany', 'obor_konkuren', 'obor_tlak', 'obor_rychly', 'obor_priliv', 'obor_publikac', 'obor_medializ', 'obor_verejnos', 'obor_komplexn', 'obor_mensi')) {
+  vnimani.objektivity(i)
+}
+```
+
+### Diskuse o objektivitě
+
+```{r Vlastnosti oboru vs. Objektivita - diskuse, warning=FALSE}
+for (i in c('obor_dotovany', 'obor_konkuren', 'obor_tlak', 'obor_rychly', 'obor_priliv', 'obor_publikac', 'obor_medializ', 'obor_verejnos', 'obor_komplexn', 'obor_mensi')) {
+  diskuse.objektivita(i)
+}
+```
+
+
+
+## Finance  
+
+### Vnímání objektivity
+
+```{r Finance vs. Objektivita - vnímání, warning=FALSE}
+for (i in c('financ_vliv', 'financ_zajisti.objektivitu', 'financ_neduvera', 'financ_zajisti.nezavislost')) {
+  vnimani.objektivity(i)
+}
+```
+
+### Diskuse o objektivitě
+
+```{r Finance vs. Objektivita - diskuse, warning=FALSE}
+for (i in c('financ_vliv', 'financ_zajisti.objektivitu', 'financ_neduvera', 'financ_zajisti.nezavislost')) {
+  diskuse.objektivita(i)
+}
+```
+
+
+
+## Kariéra  
+
+### Vnímání objektivity
+
+```{r Kariéra vs. Objektivita - vnímání, warning=FALSE}
+for (i in c('kar_praxe', 'kar_titul', 'kar_citace', 'kar_nejlepsi')) {
+  vnimani.objektivity(i)
+}
+```
+
+### Diskuse o objektivitě
+
+```{r Kariéra vs. Objektivita - diskuse, warning=FALSE}
+for (i in c('kar_praxe', 'kar_titul', 'kar_citace', 'kar_nejlepsi')) {
+  diskuse.objektivita(i)
+}
+```
+
+
+
+## Instituce  
+
+### Vnímání objektivity
+
+```{r Instituce vs. Objektivita - vnímání, warning=FALSE}
+vnimani.objektivity("instituce")
+```
+
+### Diskuse o objektivitě
+
+```{r Instituce vs. Objektivita - diskuse, warning=FALSE}
+diskuse.objektivita("instituce")
+```
+
+
+
+## Aplikovaný vs. základní výzkum
+
+### Vnímání objektivity
+
+```{r zakl_vyzkum vs. Objektivita - vnímání, warning=FALSE}
+vnimani.objektivity("zakl_vyzkum")
+```
+
+### Diskuse o objektivitě
+
+```{r zakl_vyzkum vs. Objektivita - diskuse, warning=FALSE}
+diskuse.objektivita("zakl_vyzkum")
+```
+
+
+
+## Hlavní specializace
+
+### Vnímání objektivity
+
+```{r Hlavní specializace vs. Objektivita - vnímání, warning=FALSE}
+vnimani.objektivity("spec_hlavni")
+```
+
+### Diskuse o objektivitě
+
+```{r Hlavní specializace vs. Objektivita - diskuse, warning=FALSE}
+diskuse.objektivita("spec_hlavni")
+```
+
+
+
+## Obory
+
+### Vnímání objektivity
+
+```{r Obory vs. Objektivita - vnímání}
+vnimani.objektivity("obor")
+```
+
+### Diskuse o objektivitě
+
+```{r Obory vs. Objektivita - diskuse}
+diskuse.objektivita("obor")
+```
+
+
+
+## Vliv vnímání krize replikovatelnosti   
+
+Nyní si uděláme tabulky, jak vnímání krize replikovatelnosti určuje vnímání objektivity.
+
+```{r Krize replikovatelnosti vs. Objektivita II.}
+vnimani.objektivity("krize_rep") 
+```
+
+OK, Eukleidovská distance nic moc, p-hodnota žádná... Jediný rozdíl přes 10 procentních bodů mezi alespoň dvěma kategoriemi je `nestrannost`(rozdíl `r 53.5	- 42.5` procentních bodů), zbytek je pod 10 procentních bodů. A nyní diskuse:   
+
+```{r Krize replikovatelnosti a diskuse o objektivitě II.}
+diskuse.objektivita("krize_rep")
+```
+
+Tak je vidět, že se liší ti, co považují krizi za `významnou`, časteji diskutují `někdy` (`r 46.5 - 34.0` procentních bodů oproti `není`) a méně `zřídka` než ostatní (`r 42.1 - 31.0` procentních bodů oproti `nevýznamná`). Rozdíl je statisticky významný (p-value = 0.01046).  
+
+
+## Vliv vnímání ekzaktnosti vlastního oboru  
+
+Nyní si uděláme tabulky, jak ekzatnost oboru (pozn.: ekzaktnost určuje sám respondent) určuje vnímání objektivity.
+
+```{r Ekzaktnost vs. Objektivita II.}
+vnimani.objektivity("obor_ekzaktnost")
+```
+
+OK, Eukleidovská distance nějaká je... Hlavně ji utváří `přiblížení pravdě`(rozdíl `r 33.6	- 20.7` procentních bodů), zbytek je pod 10 procentních bodů.   
+
+```{r Vliv ekzaktnosti na diskuse o objektivitě II.}
+diskuse.objektivita("obor_ekzaktnost")
+```
+
+Na diskuse nemá tedy vnímání ekzaktnosti vliv.
+
+
+## Vliv 6 činností, které hlavně respondent vykonává  
+
+Pojďme na činnosti. Musím předeslat, že jsem činnosti jsem nejdřív rekódoval tak, že 1.-3. místo jsem bral jako 'Ano', tj. že to respondent dělá, zbylé odpovědi včetně odmítnutých, že příslušnou činnost nedělá. Ale takhle připravené proměnné nic moc ohledně objektivity nediferencovali, tak je tu ani nebudu ukazovat. Je to možné rekódovat i jinak, např. 1. místo versus zbytek, a právě tohle si rovnou ukážeme (z historických důvodů se v názvu 'chunku' objeví II., byť to je tady jediná verze kódu...): 
+
+```{r Činnosti vs. Objektivita II.}
+library(knitr)
+df = data %>%
+  select(starts_with(c('cinnost_',  # hlavní činnosti 
+                       'objekt_'))) 
+prom = names(df)
+# glimpse(df)
+
+# dat = df %>% mutate_all(~as.integer(.))
+# glimpse(dat)
+
+# Chi-squared testy, zda se pohled matematiků na objektivitu signifikatně liší
+for (i in 7:17) {
+  d = df[,c(1, i)]
+  names(d) = c('styl', 'obj')
+  t = table(d$obj, d$styl)
+  names(df[, i]) %>% print()
+  t %>% prop.table(2) %>% print()
+  t %>% chisq.test() %>% print()
+  print("***************************************")
+}
+
+
+
+## Já jsem sice přišel na efektivnější způsob jak dělat tabulky, než to tu počítat celé ručně, 
+## ale z důvodů dokumentace mého vývoje v zacházení s R to tu nechám. Třeba se to bude někdy hodit... 
+
+# Kvůli výpočtům si ještě uložíme počty platných případů:
+ano = c(1:ncol(df)-1)  # Všechny případy jsou platné, proto si uložíme počty odpovědí 'Ano'
+for (i in 1:(ncol(df) - 1)) {
+  ano[i] = nrow(df[df[,i]=='Ano', i])
+}
+ano
+
+
+# Podíly vyznavačů příslušného rysu objektivity dle činnosti si uložíme do matice a spočítáme dvěma for-cykly
+vysledky = matrix(data = 1:66, nrow = 11, ncol = 6) 
+row.names(vysledky) = prom[7:17]
+colnames(vysledky) = prom[1:6]
+# vysledky
+
+## Samotný výpočet 
+for (j in 1:6) {
+  tot = df[df[,j] == 'Ano', ] %>% nrow()
+  for (i in 1:11) {
+    par = df[df[,j] == 'Ano' & df[, i + 6] == 'Ano', ]  %>% nrow()
+    vysledky[i, j] = 100 * (par / tot) %>% round(3)
+  }
+}
+
+# Změříme Euklidovskou vzdálenost výsledků:
+t(vysledky) %>% rbind(celek = obj.vse(), .) %>% dist()
+
+# Vnímání objektivity dle činností
+cbind(celek = obj.vse(), vysledky) %>% rbind(., "Abs. četnosti:" = c(nrow(df), ano[1:6])) %>% kable()
+```
+
+Tak tohle je zajímavé! Krom kvantifikace a intersubjektivity se všude najde alespoň jeden rozdíl alespoň 10 procentních bodů. Z Eukleidovské distance je vidět, že se hlavně liší `matematika` jako hlavní činnost od těch ostatních - distance matematiky je 50--61 bodů od ostatních činností, zbylých pět činností má mezi sebou vzdálenosti 12--20 bodů. Uvidíme, jestli mají činnosti vliv i na ty diskuse:
+
+```{r Vliv činností na diskuse o objektivitě II.}
+# Nejdříve si připravíme popisky matice
+prom = c(levels(df$objekt_diskut), names(df)[1:6])
+
+# Kvůli výpočtům si ještě uložíme počty platných případů 6 činností:
+ano = c(1:6)  # Všechny případy jsou platné, proto si uložíme počty odpovědí 'Ano'
+for (i in 1:6) {
+  ano[i] = nrow(df[df[,i]=='Ano', i])
+}
+# ano
+
+
+# Podíly vyznavačů příslušného rysu objektivity dle činnosti si uložíme do matice a spočítáme dvěma for-cykly
+vysledky = matrix(data = 1:24, nrow = 6, ncol = 4) 
+row.names(vysledky) = prom[5:10]
+colnames(vysledky) = prom[1:4]
+# vysledky
+
+## Samotný výpočet 
+for (i in 1:6) {
+  for (j in 1:4) {
+    tot = df[df[,i] == 'Ano', ] %>% nrow()
+    par = df[df[,i] == 'Ano' & df[, 18] == prom[j], ]  %>% nrow()
+    vysledky[i, j] = 100 * (par / tot) %>% round(3)
+  }
+}
+
+# Euklidovská distance řádků tabulky
+rbind(celek = disk.vse(), vysledky) %>% dist() %>% round(2)
+
+# Diskuse
+rbind(celek = disk.vse(), vysledky) %>% cbind(., "Abs. četnosti:" = c(nrow(df), ano[1:6]))
+
+# Grafy
+ggplot(data = (vysledky %>% as.data.frame()), mapping = aes())
+```
+
+Hmm... I tady se to projevilo. Euklidovské distance nejsou nijak brutální, ale jedna je 20,2, dalších 8 je alespoň přes 10,0.   
+
+
+## První rychlý přehled (paradoxně na konci...)  
+
+Tak, první věc byla, že jsme se podívali na jednotlivé proměnné, resp. na jejich třídění prvního stupně, tedy co jedna proměnná, to jedna tabulka.  Prostě ať vidíme distribuci. Teď je to na konci - už jsme to viděli mockrát, tak ať to u nových verzí zprávy nezdržuje...  
+
+```{r Jednoduché tabulky}
+# Pro první náhled uděláme rychle tabulku z každé proměnné, zítra ráno udělám víc
+for (i in 1:68) {
+  print('******************************************************')
+  names(data)[i] %>%  print()
+  t = data[i] %>% table(useNA = "ifany") 
+  t %>% print()
+  t %>% prop.table() %>% print()
+}
+  print('******************************************************')
+```
+
+
+## Srovnání klasifikací  
+
+A nyní se podívejme, jak na sebe sedí klasifikace oborů. Srovnáme klasifikaci AV ČR a Nature (?).  
+
+```{r Klasifikace oborů - srovnání}
+# Klasifikace oborů - srovnání
+table(data$spec_hlavni, data$obor) 
+```
+
+No, ne že by se to nepotkávalo vůbec, ale nezařezává to na 100 %... Je vidět, že respondenti neodpovídali nahodile, či vyloženě nekonzistentně, ale není tu také vidět jednoznačný způsob převodu - alespoň v případě některých kategorií.
+
+
+# Dodělávky 2022-01-17
+
+## Klasifikace vědy (6) VS vnímání objektivity (11)
+
+```{r}
+vnimani.objektivity("obor")
+```
+
+A ještě absolutní četnosti:  
+ 
+```{r}
+obj.cet = function(soubor = data){  # Nap�eme si je�t� funkci, kter� kdykoli vytvo�� vektor s vn�m�n�m objektivity cel�ho souboru
+  df = select(soubor, starts_with('objekt_'), -objekt_diskut)
+  podily = c(1:11)
+  for (i in 1:11) {
+    podily[i] = table(df[,i])[1] # %>% prop.table() %>% round(3)
+    #podily[i] = 100 * radek[1]
+  }
+  podily
+}
+
+objektivita.cetnosti = function(promenna = "obor"){
+ # P��prava dat, popisk� atd. pro zpracov�n� tabulky
+  ## Vytvo�en� objektu 'df' s vyselektovan�mi daty 
+  paste0("soubor = select(data, starts_with('objekt_'), ", promenna, ")") %>% run.text()
+
+  ## Vytvo�en� objektu 'kat' s kategoriemi nez�visle prom�nn�
+  paste0("kat = levels(soubor$", promenna,")") %>% run.text()
+  
+  ## Vytvo�en� objektu 'pok' s �etnostmi kategor� nez�visle prom�nn�
+  paste0("abs.cet = table(soubor$", promenna,")") %>% run.text()
+  
+  ## Dokon�en� �vodn�ho nastaven�
+  prom = names(soubor)
+  k = length(kat)
+  vysledky = matrix(data = 1:(11 * k), nrow = 11, ncol = k)
+  p.hodnota = c(1:11)  # vektor pro ulo�en� p-hodnot
+  row.names(vysledky) = prom[1:11]
+  colnames(vysledky) = kat[1:k]
+
+  # Samotn� v�po�et pomoc� cyklu
+  for (i in 1:11) {
+    x = table(soubor[, c(i, 13)])
+    # a = x  %>% prop.table(2) %>% round(3)
+    vysledky[i,] = x[1,] # * 100 
+    p.hodnota[i] = chisq.test(x)$p.value %>% round(3) %>% pHod()
+  }
+
+  # Ud�l�me tabulku:
+  print(paste0("Vn�m�n� objektivity dle kategori� '", promenna, "':"))
+  dx = data.frame(celek = obj.cet(), vysledky, p.hodnota) %>% 
+    rbind(., c(sum(abs.cet), abs.cet, ""))
+  row.names(dx)[12] = "Abs. po�ty:"
+  print(dx)  # P�ipojen� p-hodnot
+}
+
+objektivita.cetnosti()
+
+```
+
+
+## Klasifikace vědy (6) VS Hacking (6)  
+   
+Na to abych to dostal do jedné tabulky 6x6 bych musel napsat novou funkci, tak já to vezmu sty po stylu:  
+
+### Matematika
+
+```{r}
+t = table(data$cinnost_matem, data$obor, useNA = "ifany") 
+t %>% print()
+(prop.table(t, margin = 2) * 100) %>% print()
+```
+
+
+### Modelování
+
+```{r}
+t = table(data$cinnost_model, data$obor, useNA = "ifany") 
+t %>% print()
+(prop.table(t, margin = 2) * 100) %>% print()
+```
+ 
+
+### Teorie
+
+```{r}
+t = table(data$cinnost_teori , data$obor, useNA = "ifany") 
+t %>% print()
+(prop.table(t, margin = 2) * 100) %>% print()
+```
+
+
+### Experimenty
+
+```{r}
+t = table(data$cinnost_exper , data$obor, useNA = "ifany") 
+t %>% print()
+(prop.table(t, margin = 2) * 100) %>% print()
+```
+
+
+### Kategorizace
+
+```{r}
+t = table(data$cinnost_kateg , data$obor, useNA = "ifany") 
+t %>% print()
+(prop.table(t, margin = 2) * 100) %>% print()
+```
+
+
+### Vývoj nástrojů
+
+```{r}
+t = table(data$cinnost_vyvoj , data$obor, useNA = "ifany") 
+t %>% print()
+(prop.table(t, margin = 2) * 100) %>% print()
+```
+ 
+
+
+## Demografika
+
+### Pohlaví
+
+```{r}
+t = all$gender %>% table(useNA = "ifany") 
+t %>% print()
+(prop.table(t) * 100) %>% print()
+
+```
+
+### Věk  
+
+```{r}
+t = all$vek %>% table(useNA = "ifany") 
+t %>% print()
+(prop.table(t) * 100) %>% print()
+
+```
+
+
