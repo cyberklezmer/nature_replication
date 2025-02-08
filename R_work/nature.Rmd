@@ -31,9 +31,16 @@ library(tibble)
 library(ggplot2)
 library(ggrepel)
 library(knitr)
-
+library(ggmosaic)
 
 ```
+
+# Poznámky
+
+##Návod na přidání nové proměnné do analýzy
+
+- Ve snipetu *Loading Jedlička* přidat do *select* nebo do *mutate*
+- Ve snipetu "Loading Baker" přidat čésůp číslo sloupceš (číslo sloupce v Excelu + 1) a o řádek níž upravit první argument funnkce *prejemnuj* a v druhám přídat název sloupce. 
 
 # Úvod a příprava dat  
   
@@ -41,48 +48,16 @@ Reprodukujeme následující článek a grafy v něm: (https://www.nature.com/ar
 
 
 
-##  Dotazy pro Baker
-
-1) Jak sloučily 9 kategorií oboru výzkumu do 6?
-
-2) Můžeme použít data Baker abychom z nich ukázali, jestli nějaké regiony mají horší reprodukovatelnost?  
-
-
-
-## Petrovy instrukce   
-
-Ahoj Františku, 
-
-posílám data z Nature, článek a jejich dotaznik + otázky ke zpracování z naseho výzkumu. Odkaz na data je i v tom článku (ozn. červene). V článku nejsou zpracované např. ty geograficke informace, obory (najdes je ale v jejich datech v excelu vzadu ). 
-Co s tim dělat - navrhuju toto:
-
-> 1) První věc , že bychom srovnali vše, co je v Nature článku, a co máme i my (něco, co je v Nature, naopak chybí v našem, cili to se nas netyka).
-2) Srovnání ostatních dat z jejich excelu s nasimi daty - především se jedná o ty geografické udaje (cili "eastern effect"). Dali bychom tam  zjistění z našich dat, že to je převažně Asie, a muzeme přidat z jejich dat,  jak odpovídali jejich respondenti z jednotlivých regionů (tzn. např. jestli asijsti vedci vnimají nalehavost krize jinak nez US, Evropa atd.) Plus přidame nase zjisteni ohledne strategií, jak se tomu vědci brání.
-3) V našem dotazníku jsou také označeny další otázky ke zpracování (v sekci Objektivita) = další problémy, které způsobují neobjektivitu (nereprodukovatelnost). To tam bude jako dalsi zjisteni krome Eastern effect.
-4) Popis vzorku: muzi/zeny, ak. draha, kolik dělá základní výzkum atd. (označil jsem v našem dotazníku). Pár věcí z toho dáme do článku.
-
-Jakmile uděláš ta základní srovnání a frekvence, tak já Baker napíšu, a zjistím u ní, co má smysl dělat a co ne, pokud by to mělo jít k nim (pokud bychom to neposílali k nim, tak například do PLOS ONE). Také od ní zjistím, jestli vůbec můžeme použit ta jejich další nepublikovaná data do našeho článku (tzn. např. ty udaje o původu vědců). Případně pak můžeme udělat pár hlubších analýz, co nám přijde zajímavé. 
-
-Je také otázka, které z našich respondentů tam zařadit, já navrhuju se rozhodnout někde mezi 12- 15 minutama, a ty kratší vyřadit (než začneš).
-
-Doufám, že jsem to popsal srozumitelně. Kdyžtak napiš, co k tomu máš, nebo si zavoláme. Já tady ted 14 dní nebudu, protože budeme cestovat. Nicméně pak bych jí rád poslal ten dotaz. A pak se tomu budu věnovat po zbytek srpna a v září (vracíme se 15.8.). V říjnu bych měl jet konečně na to LSD UK.
-
-Uzivej červec a srpenec!
-Petr
-
-PS: tu kapitolou do Virginia jsem odeslal, stravil jsem ted cca týden děláním úprav. Doufám, že to finálně projde...
-
-
 
 ## Načtení dat  
 
-Data byla pipravená pomocí skriptu `Jedlicka01.Rmd`, z něj si lze vybrat dva soubory, jeden by měl být hůře připravený, ale s úplně všemi proměnnými, na které jsme se ptali (`dataAll.RData`) a druhý by měl být selektovaný, ale lépe připravený (`dataProcessed.RData`). Zkusím je nedřív porovnat.  
+Data byla pipravená pomocí skriptu `preprocess.Rmd`, z něj si lze vybrat dva soubory, jeden by měl být hůře připravený, ale s úplně všemi proměnnými, na které jsme se ptali (`dataAll.RData`) a druhý by měl být selektovaný, ale lépe připravený (`dataProcessed.RData`). Zkusím je nedřív porovnat.  
 
-```{r}
-load("../data_src/dataAll.RData")
+```{r data load}
+load("dataAll.RData")
 complete = data
 
-load("../data_src/dataProcessed.RData")
+load("dataProcessed.RData")
 selected = data
 
 ncol(complete) == ncol(selected)
@@ -95,7 +70,7 @@ Fooo-hooo! Tak z připravených dat vypadlo skoro 100 proměnných!!! Jasně, u�
 
 ## Hledání proměnných pro komparaci s Baker in Nature  
 
-```{r}
+```{r Baker Graph}
 tibble(
   `Baker Graph` = c("Is there reproducibility crisis?",
             "HOW MUCH PUBLISHED WORK IN YOUR FIELD IS REPRODUCIBLE?",
@@ -143,7 +118,7 @@ tibble(
 
 Teď jsme si udělali jasno ohledně možné komparace dat z obou výzkumů. Je jasné, že je třeba vzít `dataAll.RData`, neboť v těch selektovaných datech nic pořádně na srovnání s Baker není. Teď si tedy podle tabulky výše upravím objekt `complete` a z něj vyberu vše, co je komparovatelné.  
 
-```{r}
+```{r Loading Jedlicka}
 my = filter(complete, cas_sec >= 600, zakl_vyzkum == "Ano") %>% 
   select(krize_rep, rep_podil, spec_hlavni, nerep_jaMuj, nerep_oniMuj, 
          nerep_jaCizi, fakt_podvod:fakt_smula, 
@@ -151,6 +126,8 @@ my = filter(complete, cas_sec >= 600, zakl_vyzkum == "Ano") %>%
          frek_nerepre:neobj_salam, gender:kar_kategorie) %>%  
   mutate(
     Author = "Jedlička",
+    continent = "Europe",
+    Country = "Czech Republic",
     across(
       c(krize_rep, spec_hlavni:fakt_smula, despekt, nerep_problem:nerep_narust),
       ~recode(
@@ -182,15 +159,19 @@ my = filter(complete, cas_sec >= 600, zakl_vyzkum == "Ano") %>%
 
 ```
 
+MŠ: Warningy, které hlásí, se týkají případů, kdy v proměnných freq_xxx ne vyplněno Nevím, které překoduje do NA.
+
 Aha... Tak když jsme dali limit 10 minut, tak jsme přišli o 20 lidí, vzorek klesne na 1001, když to dáme na 12 minut, tak to klesne až na 967, to je dalších 33 lidí, tedy přijdeme o 53 lidí, tedy 5% vzorku... No, já to teď nechám na těch 12 minutách, ale stačí říct, že by se těch dalších 33 lidí hodilo a já to celé sjedu s limitem 600 sekund. Ápropós, když limit snížím na 15 minut, tak vzorem klesne až na 878 respondentů.   
    
-```{r}
+```{r Time Limit}
 tibble(`Časový limit (minuty)` = c(0, 10, 12, 15), N = c(1021, 1001, 967, 878)) %>% kable()
 ```
    
 Teď musíme provést totéž s daty od Baker. Načteme je, vybereme z nich proměnné a nakonec je budeme rekódovat tak, aby data byla srovnatelná.   
 
-```{r}
+MŠ: přidal jsem Country, která slučuje cntr.x
+
+```{r Loading Baker}
 # Definice vlastní funkce pro lepší pejmenování
 prejmenuj = function(tdf, pozice, jmena) {
   if (length(jmena) < 1) stop(print('Musíte zadat nějaká jména!'))
@@ -203,19 +184,19 @@ prejmenuj = function(tdf, pozice, jmena) {
 }
 
 
-Baker = read_xlsx("../data_src/dataNature.xlsx", skip = 1) %>% 
-  select(c(20, 22, 91, 79:80, 52:65, 85, 89, 24, 25, 50, 51)) %>% 
-  prejmenuj(1:25, 
+Baker = read_xlsx("../data_and_R_src/dataNature.xlsx", skip = 1) %>% 
+  select(c(20, 22, 91, 79:80, 52:65, 85, 89, 24, 25, 50, 51, 109:115)) %>% 
+  prejmenuj(1:32, 
             c("krize_rep", "rep_podil", "spec_hlavni", "nerep_jaMuj", "nerep_jaCizi",
               'fakt_podvod', 'fakt_karier', 'fakt_dohled', 'fakt_recenz', 'fakt_selekc',
               'fakt_replik', 'fakt_statis', 'fakt_odborn', 'fakt_data', 'fakt_dokume',
               'fakt_metody', 'fakt_variab', 'fakt_design', 'fakt_smula', 
-              "nerep_oniMuj", "educ",#, "continent", "cntr.1", "cntr.2", "cntr.3", "cntr.4", "cntr.5", "cntr.6"
-              "nerep_problem", "nerep_problemAll", "nerep_chyba", "nerep_neobj"
+              "nerep_oniMuj", "educ",
+              "nerep_problem", "nerep_problemAll", "nerep_chyba", "nerep_neobj",   
+               "continent", "cntr.1", "cntr.2", "cntr.3", "cntr.4", "cntr.5", "cntr.6"
               )) %>% 
   mutate(
-    Author = "Baker",
-    across(
+      across(
       c(krize_rep:nerep_oniMuj),
       ~recode(
         .x,
@@ -231,11 +212,18 @@ Baker = read_xlsx("../data_src/dataNature.xlsx", skip = 1) %>%
       )
     )
   )
+
+  Baker <- Baker %>% 
+    rowwise() %>% 
+     mutate( Author = "Baker",
+       Country = paste0(na.omit(c_across(starts_with("cntr."))), collapse = ", ")
+ )
+
 ```
 
 Tak proměnné jsou vybrané a základní příprava hotová, teď můžeme soubory spojit, aby je bylo možné porovnat, dočištění, které lze udělat společně, to uděláme společně teď, tedy hned po spojení:
 
-```{r}
+```{r Joining}
 df = add_rows(my, Baker) %>%  # Takto spojíme soubory
   mutate(
     rep_podil = parse_number(rep_podil),
@@ -255,6 +243,8 @@ df = add_rows(my, Baker) %>%  # Takto spojíme soubory
      )
   )
 ```
+
+MŠ: Warningy viz výše
 
 # Grafy  
 
@@ -287,6 +277,239 @@ Tak tady jsem si všiml, a není to chyba!, že v našem výzkumu chybí 120 poz
 
 Jinak, překvapení se nekoná, graf z Nature sedí, čísla jsme reprodukovali.
 
+MŠ, přesněji, stejně jsme to spočítali z jejích dat. Nicméně bych neřekl, že jsme reprodkuovali její výzkum v Čecháh. I pokud budeme zkoumat jen ty, co vědí, ale přiděláme CI, vidíme, že se se ve dvou případech neprotínají.
+
+```{r}
+
+
+dfsknowing <- df %>% 
+  filter(krize_rep != "I don't know") %>%
+  select(krize_rep, Author) %>%
+  filter(!is.na(krize_rep)) %>%
+  group_by(Author) %>%
+  mutate(N = n()) %>%
+  group_by(Author, krize_rep, N) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  mutate(f = round(n / N * 100, 1)) %>%
+  mutate(se = sqrt((f * (100 - f)) / N),  # Standard error
+         lower = f - 1.96 * se,           # 95% CI Lower Bound
+         upper = f + 1.96 * se)           # 95% CI Upper Bound
+
+  
+  
+dodge_width <- 0.9  # Adjust dodging width for correct spacing
+
+ggplot(dfsknowing, aes(y = fct_rev(krize_rep), x = f, fill = Author, label = paste(f, "%"))) +
+  geom_col(alpha = 0.75, na.rm = TRUE, position = position_dodge(width = dodge_width), 
+           width = 0.4) +  # Reduce bar width to avoid overlap
+  geom_errorbar(aes(xmin = lower, xmax = upper), 
+                width = 0.2, 
+                position = position_dodge(width = dodge_width)) + 
+  geom_text(position = position_dodge(width = dodge_width), hjust = -0.5) +
+  labs(title = "Is there a reproducibility crisis?", x = "%", 
+       caption = paste0("N_Baker = ", dfsknowing[1, "N"], 
+                        ", N_Jedlička = ", dfsknowing[8, "N"])) +
+  theme_minimal()
+
+
+```
+
+A když uděláme exaktní statistickej test toho, že mezi těmi, co vědí, jsou poměry stejné u nás a u bakerové, vyjde supersignifikantně (že ne).
+
+```{r}
+# Ensure the dataframe is ungrouped
+reduced_dfs <- dfsknowing %>%
+  select(Author, krize_rep, n) %>%
+  ungroup() %>%  # REMOVE GROUPING
+  mutate(
+    Author = as.character(Author),     # Convert factors to characters
+    krize_rep = as.character(krize_rep)
+  )
+
+
+# Convert to contingency table
+data_for_chisq <- xtabs(n ~ Author + krize_rep, data = reduced_dfs)
+
+
+
+# Perform Chi-Square Test
+chi_result <- chisq.test(data_for_chisq)
+
+data_df <- as.data.frame(as.table(data_for_chisq))
+
+# Create the mosaic plot
+ggplot(data_df) +
+  geom_mosaic(aes(weight = Freq, x = product(Author), fill = krize_rep)) +
+  labs(title = "Mosaic Plot of Contingency Table",
+       x = "Author",
+       y = "krize_rep",
+       fill = "krize_rep") +
+  theme_minimal()
+
+
+# Print results
+print(chi_result)
+
+```
+
+Takže hypotéza *Náhodně vybraný vědecký týpek to má tak a tak* v Česku neplatí. Tak ted zkoumejme, zda to vyjde aspoň po zohlednění kontinentu, a rozdělíme Evropu na východní a západní.
+
+```{r}
+
+# Read the CSV file containing East and West Europe classification
+europe_regions <- read.csv("east_and_west_europe.csv")
+
+# Assume `df` is your main data frame with a "Continent" column
+# Merge with `df` based on country
+df <- df %>%
+  left_join(europe_regions, by = "Country") %>%  # Adjust "Country" if needed
+  mutate(Subcontinent = ifelse(continent == "Europe", Region, continent)) %>%
+  select(-Region)  # Remove the Region column if no longer needed
+
+# Print updated data frame
+
+
+dfsknowingcontinent <- df %>% 
+  filter(krize_rep != "I don't know") %>%
+  select(krize_rep, Author, Subcontinent) %>%
+  filter(!is.na(krize_rep)) %>%
+  group_by(Author, Subcontinent) %>%
+  mutate(N = n()) %>%
+  group_by(Author, Subcontinent, krize_rep, N) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  mutate(f = round(n / N * 100, 1)) %>%
+  mutate(se = sqrt((f * (100 - f)) / N),  # Standard error
+         lower = f - 1.96 * se,           # 95% CI Lower Bound
+         upper = f + 1.96 * se)  %>%
+  mutate(Author_Cont = paste0(Author,substr(Subcontinent,1,10)))
+
+
+  
+# Ensure the dataframe is ungrouped
+reduced_dfs <- dfsknowingcontinent %>%
+  select(Author_Cont, krize_rep, n) %>%
+  ungroup() %>%  # REMOVE GROUPING
+  mutate(
+    Author_Cont = as.character(Author_Cont),     # Convert factors to characters
+    krize_rep = as.character(krize_rep)
+  )
+
+
+# Convert to contingency table
+data_for_chisq <- xtabs(n ~ Author_Cont + krize_rep, data = reduced_dfs)
+
+data_df <- as.data.frame(as.table(data_for_chisq))
+
+# Create the mosaic plot
+ggplot(data_df) +
+  geom_mosaic(aes(weight = Freq, x = product(Author_Cont), fill = krize_rep)) +
+  labs(title = "Mosaic Plot of Contingency Table",
+       x = "Author_Cont",
+       y = "krize_rep",
+       fill = "krize_rep") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),  # Rotate X labels
+    legend.position = "none"  # Remove legend
+  )
+
+
+
+```
+
+
+A když udělám chi-sq test pro naše a Bakerové východně evropské respondenty
+
+```{r}
+
+
+
+# Ensure the dataframe is ungrouped
+reduced_dfs_ac <- dfsknowingcontinent %>%
+  filter(Subcontinent == "East Europe") %>%
+  select(Author, krize_rep, n) %>%
+  ungroup() %>%  # REMOVE GROUPING
+  mutate(
+    Author = as.character(Author),     # Convert factors to characters
+    krize_rep = as.character(krize_rep)
+  )
+
+
+# Convert to contingency table
+data_for_chisq_ac <- xtabs(n ~ Author + krize_rep, data = reduced_dfs_ac)
+
+# Perform Chi-Square Test
+chi_result <- chisq.test(data_for_chisq_ac)
+
+
+# Convert contingency table to a data frame
+data_df <- as.data.frame(as.table(data_for_chisq_ac))
+
+# Create the mosaic plot
+ggplot(data_df) +
+  geom_mosaic(aes(weight = Freq, x = product(Author), fill = krize_rep)) +
+  labs(title = "Mosaic Plot of Contingency Table",
+       x = "Author",
+       y = "krize_rep",
+       fill = "krize_rep") +
+  theme_minimal()
+
+
+
+# Print results
+print(chi_result)
+
+```
+ 
+...tak furt nic. Co specializace 
+
+```{r}
+dfsknowingcspec <- df %>% 
+  filter(krize_rep != "I don't know") %>%
+  select(krize_rep, Author, spec_hlavni) %>%
+  filter(!is.na(krize_rep)) %>%
+  group_by(Author, spec_hlavni) %>%
+  mutate(N = n()) %>%
+  group_by(Author, spec_hlavni, krize_rep, N) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  mutate(f = round(n / N * 100, 1)) %>%
+  mutate(se = sqrt((f * (100 - f)) / N),  # Standard error
+         lower = f - 1.96 * se,           # 95% CI Lower Bound
+         upper = f + 1.96 * se)  %>%
+  mutate(Author_Spec = paste0(Author,substr(spec_hlavni,1,3)))
+
+reduced_dfs <- dfsknowingcspec %>%
+  select(Author_Spec, krize_rep, n) %>%
+  ungroup() %>%  # REMOVE GROUPING
+  mutate(
+    Author_Spec = as.character(Author_Spec),     # Convert factors to characters
+    krize_rep = as.character(krize_rep)
+  )
+
+
+# Convert to contingency table
+data_for_chisq <- xtabs(n ~ Author_Spec + krize_rep, data = reduced_dfs)
+
+data_df <- as.data.frame(as.table(data_for_chisq))
+
+# Create the mosaic plot
+ggplot(data_df) +
+  geom_mosaic(aes(weight = Freq, x = product(Author_Spec), fill = krize_rep)) +
+  labs(title = "Mosaic Plot of Contingency Table",
+       x = "Author_Cont",
+       y = "krize_rep",
+       fill = "krize_rep") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),  # Rotate X labels
+    legend.position = "none"  # Remove legend
+  )
+  
+  
+
+
+```
+Tak tím to taky nebude.
 
 ## HOW MUCH PUBLISHED WORK IN YOUR FIELD IS REPRODUCIBLE?  
 
