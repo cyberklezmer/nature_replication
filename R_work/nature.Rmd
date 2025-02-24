@@ -253,7 +253,7 @@ V téhle části jednak zreplikuju grafy Monyi Baker z Nature a rovnou je srovn�
 
 ## Is there reproducibility crisis?
 
-```{r}
+```{r istherecrisis, echo=FALSE}
 
 dfs = df %>% select(krize_rep, Author) %>% filter(!is.na(krize_rep)) %>%  
   group_by(Author) %>% mutate(N = n()) %>% 
@@ -277,29 +277,63 @@ Tak tady jsem si všiml, a není to chyba!, že v našem výzkumu chybí 120 poz
 
 Jinak, překvapení se nekoná, graf z Nature sedí, čísla jsme reprodukovali.
 
-MŠ, přesněji, stejně jsme to spočítali z jejích dat. Nicméně bych neřekl, že jsme reprodkuovali její výzkum v Čecháh. I pokud budeme zkoumat jen ty, co vědí, ale přiděláme CI, vidíme, že se se ve dvou případech neprotínají.
+MŠ, přesněji, stejně jsme to spočítali z jejích dat. Nicméně bych neřekl, že jsme reprodkuovali její výzkum v Čechách. Ale když přiděláme CI, vidíme, že se ve dvou případech neprotínají. A to ani pokud Jedličku převážím tak, aby populace dle oborý byla stejná.
 
 ```{r}
 
+dfspecs <- df %>% 
+  select(krize_rep, Author, spec_hlavni) %>%
+  filter(!is.na(krize_rep)) %>%
+  group_by(Author, spec_hlavni) %>%
+  summarize(N = n())
 
-dfsknowing <- df %>% 
-  filter(krize_rep != "I don't know") %>%
+
+dfjedlicka <- dfspecs  %>% 
+    filter(Author == "Jedlička")
+
+dfbaker <- dfspecs  %>% 
+    filter(Author == "Baker") %>% 
+  rename(
+    Baker_N = N
+  )
+
+dfw <- dfjedlicka  %>% 
+  left_join(dfbaker, by="spec_hlavni") %>% 
+  mutate( w = Baker_N / N)
+
+dfraw <- df %>% 
+#  filter(krize_rep != "I don't know") %>%
   select(krize_rep, Author) %>%
   filter(!is.na(krize_rep)) %>%
   group_by(Author) %>%
-  mutate(N = n()) %>%
+  mutate(N = n())  %>%
   group_by(Author, krize_rep, N) %>%
-  summarise(n = n(), .groups = "drop") %>%
+  summarise(n = n(), .groups = "drop") 
+
+dfadj <- df  %>% 
+#  filter(krize_rep != "I don't know") %>%
+  filter(!is.na(krize_rep)) %>%
+  select(krize_rep, Author,spec_hlavni) %>%
+  filter(Author == "Jedlička") %>%
+  mutate(Author = "JedličkaNorm") %>%
+  left_join(dfw, by="spec_hlavni") %>% 
+  select(krize_rep, Author, w) %>%
+  group_by(Author) %>%
+  mutate(N = sum(w))  %>%
+  group_by(Author, krize_rep, N) %>%
+  summarise(n = sum(w), .groups = "drop") 
+  
+df_total <- bind_rows(dfraw,dfadj)
+
+df_total <- df_total %>%
   mutate(f = round(n / N * 100, 1)) %>%
   mutate(se = sqrt((f * (100 - f)) / N),  # Standard error
          lower = f - 1.96 * se,           # 95% CI Lower Bound
          upper = f + 1.96 * se)           # 95% CI Upper Bound
 
-  
-  
 dodge_width <- 0.9  # Adjust dodging width for correct spacing
 
-ggplot(dfsknowing, aes(y = fct_rev(krize_rep), x = f, fill = Author, label = paste(f, "%"))) +
+ggplot(df_total, aes(y = fct_rev(krize_rep), x = f, fill = Author, label = paste(f, "%"))) +
   geom_col(alpha = 0.75, na.rm = TRUE, position = position_dodge(width = dodge_width), 
            width = 0.4) +  # Reduce bar width to avoid overlap
   geom_errorbar(aes(xmin = lower, xmax = upper), 
@@ -307,8 +341,8 @@ ggplot(dfsknowing, aes(y = fct_rev(krize_rep), x = f, fill = Author, label = pas
                 position = position_dodge(width = dodge_width)) + 
   geom_text(position = position_dodge(width = dodge_width), hjust = -0.5) +
   labs(title = "Is there a reproducibility crisis?", x = "%", 
-       caption = paste0("N_Baker = ", dfsknowing[1, "N"], 
-                        ", N_Jedlička = ", dfsknowing[8, "N"])) +
+       caption = paste0("N_Baker = ", df_total[1, "N"], 
+                        ", N_Jedlička = ", df_total[8, "N"])) +
   theme_minimal()
 
 
@@ -316,28 +350,35 @@ ggplot(dfsknowing, aes(y = fct_rev(krize_rep), x = f, fill = Author, label = pas
 
 A když uděláme exaktní statistickej test toho, že mezi těmi, co vědí, jsou poměry stejné u nás a u bakerové, vyjde supersignifikantně (že ne).
 
-```{r}
+Pořadí obdélníčků je v kr_levels.
+
+```{r replication test}
 # Ensure the dataframe is ungrouped
-reduced_dfs <- dfsknowing %>%
+
+kr_levels <- c("No crisis", "Yes, slight crisis",
+    "Yes, significant crisis", "I don't know" )
+
+reduced_dfs <- df_total %>%
   select(Author, krize_rep, n) %>%
-  ungroup() %>%  # REMOVE GROUPING
+  ungroup() %>%  
   mutate(
-    Author = as.character(Author),     # Convert factors to characters
-    krize_rep = as.character(krize_rep)
+    krize_rep = factor(krize_rep, levels = kr_levels),
+    Author = as.character(Author)
   )
 
 
 # Convert to contingency table
 data_for_chisq <- xtabs(n ~ Author + krize_rep, data = reduced_dfs)
 
-
-
 # Perform Chi-Square Test
 chi_result <- chisq.test(data_for_chisq)
 
 data_df <- as.data.frame(as.table(data_for_chisq))
 
-# Create the mosaic plot
+# Ensure krize_rep ordering is kept
+data_df$krize_rep <- factor(data_df$krize_rep, levels = levels(reduced_dfs$krize_rep))
+
+# Mosaic plot with your custom ordering for stacked values (krize_rep)
 ggplot(data_df) +
   geom_mosaic(aes(weight = Freq, x = product(Author), fill = krize_rep)) +
   labs(title = "Mosaic Plot of Contingency Table",
@@ -345,14 +386,12 @@ ggplot(data_df) +
        y = "krize_rep",
        fill = "krize_rep") +
   theme_minimal()
-
-
 # Print results
 print(chi_result)
 
 ```
 
-Takže hypotéza *Náhodně vybraný vědecký týpek to má tak a tak* v Česku neplatí. Tak ted zkoumejme, zda to vyjde aspoň po zohlednění kontinentu, a rozdělíme Evropu na východní a západní.
+Takže hypotéza *Náhodně vybraný vědecký týpek to má tak a tak* v Česku neplatí. Tak ted zkoumejme, zda to vyjde aspoň po zohlednění kontinentu, a rozdělíme Evropu na východní a západní. Klasifikace zemí je uložena v níže uvedeném souboru (Baker rozlišuje jen jednu Evropu).
 
 ```{r}
 
@@ -370,7 +409,7 @@ df <- df %>%
 
 
 dfsknowingcontinent <- df %>% 
-  filter(krize_rep != "I don't know") %>%
+#  filter(krize_rep != "I don't know") %>%
   select(krize_rep, Author, Subcontinent) %>%
   filter(!is.na(krize_rep)) %>%
   group_by(Author, Subcontinent) %>%
@@ -391,7 +430,7 @@ reduced_dfs <- dfsknowingcontinent %>%
   ungroup() %>%  # REMOVE GROUPING
   mutate(
     Author_Cont = as.character(Author_Cont),     # Convert factors to characters
-    krize_rep = as.character(krize_rep)
+      krize_rep = factor(krize_rep, levels = kr_levels)
   )
 
 
@@ -431,7 +470,7 @@ reduced_dfs_ac <- dfsknowingcontinent %>%
   ungroup() %>%  # REMOVE GROUPING
   mutate(
     Author = as.character(Author),     # Convert factors to characters
-    krize_rep = as.character(krize_rep)
+    krize_rep = factor(krize_rep, levels = kr_levels)
   )
 
 
@@ -465,7 +504,7 @@ print(chi_result)
 
 ```{r}
 dfsknowingcspec <- df %>% 
-  filter(krize_rep != "I don't know") %>%
+#  filter(krize_rep != "I don't know") %>%
   select(krize_rep, Author, spec_hlavni) %>%
   filter(!is.na(krize_rep)) %>%
   group_by(Author, spec_hlavni) %>%
@@ -476,15 +515,15 @@ dfsknowingcspec <- df %>%
   mutate(se = sqrt((f * (100 - f)) / N),  # Standard error
          lower = f - 1.96 * se,           # 95% CI Lower Bound
          upper = f + 1.96 * se)  %>%
-  mutate(Author_Spec = paste0(Author,substr(spec_hlavni,1,3)))
+  mutate(Author_Spec = paste0(substr(spec_hlavni,1,3),Author))
 
 reduced_dfs <- dfsknowingcspec %>%
   select(Author_Spec, krize_rep, n) %>%
   ungroup() %>%  # REMOVE GROUPING
   mutate(
     Author_Spec = as.character(Author_Spec),     # Convert factors to characters
-    krize_rep = as.character(krize_rep)
-  )
+       krize_rep = factor(krize_rep, levels = kr_levels)
+ )
 
 
 # Convert to contingency table
@@ -512,6 +551,8 @@ ggplot(data_df) +
 Tak tím to taky nebude.
 
 ## HOW MUCH PUBLISHED WORK IN YOUR FIELD IS REPRODUCIBLE?  
+
+TBD - předělat graf
 
 Ještě jsem neudělal graf a už tuším problém :( Nikde jsem nenašel dokumentaci, jak Baker rekódovala specializace. V datech je 9 kategorií (nemá matematiku jako my). Abych se s tím nedrbal donekonečna, tak jsem to zatím uděl podle těch 9/10 kategorií, co jsou v datech, pak se když tak poradíme, jak to sloučit.  
 
@@ -568,6 +609,21 @@ ggplot(dfs, aes(y = spec_hlavni, col = spec_hlavni, x = mean,
   # scale_x_log10() +
   guides(fill = "none") +
   theme_minimal()
+
+dodge_width <- 0.9  # Adjust dodging width for correct spacing
+
+ggplot(dfs, aes(y = fct_rev(spec_hlavni), x = mean, fill = Author, label = paste(round(mean,1), "%"))) +
+  geom_col(alpha = 0.75, na.rm = TRUE, position = position_dodge(width = dodge_width), 
+           width = 0.4) +  # Reduce bar width to avoid overlap
+  geom_errorbar(aes(xmin = mean-se, xmax = mean+se), 
+                width = 0.2, 
+                position = position_dodge(width = dodge_width)) + 
+  geom_text(position = position_dodge(width = dodge_width), hjust = -0.5) +
+  labs(title = "How much work replicable", x = "%", 
+       caption = paste0("N_Baker = ", df_total[1, "N"], 
+                        ", N_Jedlička = ", df_total[8, "N"])) +
+  theme_minimal()
+
 
 ```
 
