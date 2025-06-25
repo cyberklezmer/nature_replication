@@ -79,10 +79,12 @@ PS: tu kapitolou do Virginia jsem odeslal, stravil jsem ted cca týden dělání
 Data byla pipravená pomocí skriptu `Jedlicka01.Rmd`, z něj si lze vybrat dva soubory, jeden by měl být hůře připravený, ale s úplně všemi proměnnými, na které jsme se ptali (`dataAll.RData`) a druhý by měl být selektovaný, ale lépe připravený (`dataProcessed.RData`). Zkusím je nedřív porovnat.  
 
 ```{r}
-load("../data_src/dataAll.RData")
+# load("../data_src/dataAll.RData")
+load("../data_and_R_src/dataAll.RData")
 complete = data
 
-load("../data_src/dataProcessed.RData")
+# load("../data_src/dataProcessed.RData")
+load("../data_and_R_src/dataProcessed.RData")
 selected = data
 
 ncol(complete) == ncol(selected)
@@ -203,7 +205,8 @@ prejmenuj = function(tdf, pozice, jmena) {
 }
 
 
-Baker = read_xlsx("../data_src/dataNature.xlsx", skip = 1) %>% 
+# Baker = read_xlsx("../data_src/dataNature.xlsx", skip = 1) %>% 
+Baker = read_xlsx("../data_and_R_src/dataNature.xlsx", skip = 1) %>% 
   select(c(20, 22, 91, 79:80, 52:65, 85, 89, 24, 25, 50, 51)) %>% 
   prejmenuj(1:25, 
             c("krize_rep", "rep_podil", "spec_hlavni", "nerep_jaMuj", "nerep_jaCizi",
@@ -1064,7 +1067,44 @@ dfsx %>%
 
 
 ```
+## Petr Jedlička email z 25.2.2025
+1) Reprodukovatelnost (Názor na krizi) 
+- předpokládáme vliv:
+a) Obor (dle angl. číselníku, který je v obou výzkumech stejný), 
+b) dále Sociodemografické faktory
+c) Akademická kariéra (Ot 41-48), případně i další otázky: č. 50 podíl základního výzkumu u respondenta, pří. Ot: 49 - podíl věd činnosti u respondenta, Ot 50 - podíl zákl/apl výzkumu, které by tam mohly spadat 
+Metoda: MLR, multinomial log. regression?
 
+2) Faktory reprodukovatelnosti 
+- přejímáme baterii od Bakerové (ot. 16)
++ máme novou unikátní baterii faktorů (ot. 24 - z kval výzkumu, pozor: k této baterii máme i otázku č. 25 na "zavážnost")
+Metoda: komparace ?.
+
+3) Obor a Reprodukovatelnost v jednotlivých oborech (ot. 8) 
+- předpokládáme vliv: Charakteristiky oboru (baterie v dotazníku se škálou Ot 51 (lze dichotomizovat), + alternativně další otázky v dotazníku: č. 54 "exaktnost oboru", č. 52 velikost oboru)
+Metoda: comparison, cluster analysis (char. oborů), factor analysis?
+Pozn: Ještě mě napadlo udělat nějakou kompozitní proměnnou z Otázek 18-20 (Pokoušel jsem se neúspěšně zopakovat svůjj experiment / někoho jiného / někdo nemohl reprodukovat můj), protože to je vlastně taky míra nereprodukovatelnosti v daném oboru
+
+4) Geography 
+- sledujeme vliv regionu (též může být v případě Baker zahrnut do regresního modelu)
++ naše otázky: odkud pocházejí vadné studie (ot 10 a 11)
+
+5) Coping strategies
+- jak reagujete na reprodukovatelnost (ot. 15)
+
+6) něco už jsem probrali, ale posílám pro jistotu:
+
+POZNÁMKY
+1. Některé otázky z Nature nejsou v česku, a naopak
+2. Respondenti – Nature I ČR  = měli by být jen ti, co dělají základní výzkum (zkontrolovat)
+3. Cizinci v ČR (kval. odpovědi anglicky)
+4. Některé nepovinné (tzn. Liší se N) – budeme vždy uvádet u konkrétní otázky (grafu)
+5. +Hodnota Nevím (ČR) – srovnáváme srovnatelné N / ČR
+6. Prac. zařazení (av, mu, jču, uk) – instituce mají různé hodnoty, ale lze uspořádat
+7. Cut off score (do 12 minut na vyplnění- kontrola dat od Františka)
+8. Kvalitativní otázky (některé zařadíme – např. země, jiné budou  jen výběrově pojednány v textu)
+9. Anglické popisky – v základním souboru ne X ve výsledcích ano
+10.Matematici -vyřešit
 
 
 
