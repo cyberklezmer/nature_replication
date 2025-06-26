@@ -1075,6 +1075,18 @@ b) dále Sociodemografické faktory
 c) Akademická kariéra (Ot 41-48), případně i další otázky: č. 50 podíl základního výzkumu u respondenta, pří. Ot: 49 - podíl věd činnosti u respondenta, Ot 50 - podíl zákl/apl výzkumu, které by tam mohly spadat 
 Metoda: MLR, multinomial log. regression?
 
+```{r}
+# Dependent variable:
+# reproducibility
+# Explanatory variables:
+# research area (obor) 
+# sociodemographic factors
+# stage of research career (41-48, ... ?)
+# share of basic research (50)
+# share of research (49)
+```
+
+
 2) Faktory reprodukovatelnosti 
 - přejímáme baterii od Bakerové (ot. 16)
 + máme novou unikátní baterii faktorů (ot. 24 - z kval výzkumu, pozor: k této baterii máme i otázku č. 25 na "zavážnost")
