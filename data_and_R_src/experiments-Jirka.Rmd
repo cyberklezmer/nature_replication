@@ -1,0 +1,99 @@
+---
+title: "experiments-Jirka"
+output: html_document
+date: "2025-07-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+## Encoding: UTF-8
+
+library(dplyr)
+library(readxl)
+library(readr)
+library(tidyr)
+library(forcats)
+library(stringr)
+library(sjmisc)
+library(tibble)
+library(ggplot2)
+library(ggrepel)
+library(knitr)
+
+
+```
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+## 
+
+- čísla otázek jsou uvedena v souboru Objektivita přírodních věd - I. část (MU).pdf v adresáři materials
+- propojení názvů a popisu je v souboru názvy-a-popis.xlsx v adresáři data_and_R_src
+
+## Petr Jedlička email z 25.2.2025
+
+1) Reprodukovatelnost (Názor na krizi) 
+- předpokládáme vliv:
+a) Obor (dle angl. číselníku, který je v obou výzkumech stejný), 
+b) dále Sociodemografické faktory
+c) Akademická kariéra (Ot 41-48), případně i další otázky: č. 50 podíl základního výzkumu u respondenta, pří. Ot: 49 - podíl věd činnosti u respondenta, Ot 50 - podíl zákl/apl výzkumu, které by tam mohly spadat 
+Metoda: MLR, multinomial log. regression?
+
+
+```{r}
+# load("../data_src/dataAll.RData")
+load("../data_and_R_src/dataAll.RData")
+complete = data
+# the same filter as in nature.Rmd
+my = filter(complete, cas_sec >= 600, zakl_vyzkum == "Ano")
+# which gives 878 respondents
+
+dependent.var <- "krize_rep"
+explanatory.vars <- c(
+"spec_hlavni",
+"gender",           
+"vek",          
+"kar_praxe",
+"kar_titul",       
+"kar_citace",      
+"kar_nejlepsi",     
+"kar_kategorie",
+"pomer_veda",
+"pomer_zakladni",
+"obor_dotovany",
+"obor_konkuren",
+"obor_tlak",
+"obor_rychly",
+"obor_priliv",
+"obor_publikac",
+"obor_medializ",
+"obor_verejnos",
+"obor_komplexn",
+"obor_mensi",
+"cinnost_matem",
+"cinnost_model",
+"cinnost_teori",
+"cinnost_exper",
+"cinnost_kateg",
+"cinnost_vyvoj",
+"obor_ekzaktnost")
+
+other.vars <- c("obor")
+
+# nyní musíme specifikovat, které vysvětlující veličiny se mohou chápat jako ordinální
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

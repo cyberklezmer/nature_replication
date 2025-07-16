@@ -1068,6 +1068,8 @@ dfsx %>%
 
 ```
 ## Petr Jedlička email z 25.2.2025
+(čísla otázek jsou uvedena v souboru Objektivita přírodních věd - I. část (MU).pdf v adresáři materials)
+
 1) Reprodukovatelnost (Názor na krizi) 
 - předpokládáme vliv:
 a) Obor (dle angl. číselníku, který je v obou výzkumech stejný), 
@@ -1082,7 +1084,7 @@ dfs = df %>% select(krize_rep, Author) %>% filter(!is.na(krize_rep)) %>%
   group_by(Author) %>% mutate(N = n()) %>% 
   group_by(Author, krize_rep, N) %>% summarise(n = n()) %>% 
   mutate(f = round(n / N * 100, 1))
-dfs.Jedlicka <- dfs %>% filter(Author=="Jedlicka")
+dfs.Jedlicka <- dfs %>% filter(Author=="Jedlička")
 ggplot(dfs.Jedlicka, aes(y = fct_rev(krize_rep), x = f, fill="pink", label = paste(f, "%"))) +
   geom_col(alpha = 0.75, na.rm = T, position = position_dodge2(rev = T)) +
   geom_text(position = position_dodge2(width = 0.8, reverse = T)) +
@@ -1090,12 +1092,20 @@ ggplot(dfs.Jedlicka, aes(y = fct_rev(krize_rep), x = f, fill="pink", label = pas
   # scale_x_log10() +
   # guides(fill = "none") +
   theme_minimal()
+df.Jedlicka <- df %>% filter(Author=="Jedlička")
 # Explanatory variables:
 # research area (obor) 
 # sociodemographic factors
 # stage of research career (41-48, ... ?)
 # share of basic research (50)
 # share of research (49)
+```
+
+
+```{r}
+table(my[,c("krize_rep","spec_hlavni")])
+table(my[,c("krize_rep","vek")])
+
 ```
 
 
