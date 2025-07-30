@@ -53,6 +53,8 @@ my = filter(complete, cas_sec >= 600, zakl_vyzkum == "Ano")
 # which gives 878 respondents
 
 dependent.var <- "krize_rep"
+barplot(table(my[,dependen.var]))
+
 explanatory.vars <- c(
 "spec_hlavni",
 "gender",           
@@ -82,9 +84,49 @@ explanatory.vars <- c(
 "cinnost_vyvoj",
 "obor_ekzaktnost")
 
+# Když máme "spec_hlavni" (10 kategorií) asi už nechceme "obor" (12 kategorií, navíc podivných) 
+# Jak se liší Aplikovaná fyzika od Sekce aplikované fyziky? Třeba spojit do jedné.
+# Podobně u ostatních - nakonec vede na 6 oborů (sekcí)
 other.vars <- c("obor")
 
-# nyní musíme specifikovat, které vysvětlující veličiny se mohou chápat jako ordinální
+# Nyní specifikujeme, které vysvětlující veličiny explanatory.vars se mohou chápat pomocí Likertovy škály.
+# Veličiny mají 5 odpovědí, ale Exaktnost má pouze 3 odpovědi.
+# Jak zacházet s odpovědí "Nevím"? 
+# Spíše než NA jako s neutrálním stavem?
+likert.vars <- c(
+"obor_dotovany",
+"obor_konkuren",
+"obor_tlak",
+"obor_rychly",
+"obor_priliv",
+"obor_publikac",
+"obor_medializ",
+"obor_verejnos",
+"obor_komplexn",
+"obor_mensi",
+"obor_ekzaktnost"
+)
+
+# Nyní specifikujeme, které vysvětlující veličiny explanatory.vars se nemohou chápat pomocí Likertovy škály, ale jsou ordinální.
+ordinal.vars <- c(
+"vek",          
+"kar_praxe",
+"kar_titul",       
+"kar_citace",      
+"kar_kategorie",
+"pomer_veda",
+"pomer_zakladni",
+"cinnost_matem",
+"cinnost_model",
+"cinnost_teori",
+"cinnost_exper",
+"cinnost_kateg",
+"cinnost_vyvoj")
+
+# u ordinálních veličin musíme správně nastavit uspořádání jejich hodnot
+# Velmi složité najít uspořádání u veličiny kar_kategorie, která má 27 různých hodnot
+
+
 
 ```
 
