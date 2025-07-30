@@ -55,6 +55,9 @@ my = filter(complete, cas_sec >= 600, zakl_vyzkum == "Ano")
 dependent.var <- "krize_rep"
 barplot(table(my[,dependen.var]))
 
+# If we want to make dependent variable ordinal
+my[[dependent.var]] <- ordered(my[[dependent.var]],
+                              levels = c("Ano, významná krize","Ano, nevýznamná krize","Nevím","Ne, žádná krize není"))
 explanatory.vars <- c(
 "spec_hlavni",
 "gender",           
@@ -93,6 +96,7 @@ other.vars <- c("obor")
 # Veličiny mají 5 odpovědí, ale Exaktnost má pouze 3 odpovědi.
 # Jak zacházet s odpovědí "Nevím"? 
 # Spíše než NA jako s neutrálním stavem?
+# Je třeba stanovit uspořádání 
 likert.vars <- c(
 "obor_dotovany",
 "obor_konkuren",
@@ -106,6 +110,14 @@ likert.vars <- c(
 "obor_mensi",
 "obor_ekzaktnost"
 )
+for (i in 1:(length(likert.vars)-1)){
+  my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
+                                  levels = c("Rozhodně ne", "Spíše ne", "Nevím", "Spíše ano", "Rozhodně ano"))
+}
+i <- length(likert.vars)
+my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
+                                  levels = c("„Měkčí“ (méně exaktní)", "Nedokážu posoudit", "„Tvrdší“ (exaktnější)"))
+levels(my[[likert.vars[i]]]) <-  c("Spíše ne", "Nevím", "Spíše ano")
 
 # Nyní specifikujeme, které vysvětlující veličiny explanatory.vars se nemohou chápat pomocí Likertovy škály, ale jsou ordinální.
 ordinal.vars <- c(
@@ -113,7 +125,6 @@ ordinal.vars <- c(
 "kar_praxe",
 "kar_titul",       
 "kar_citace",      
-"kar_kategorie",
 "pomer_veda",
 "pomer_zakladni",
 "cinnost_matem",
@@ -122,11 +133,129 @@ ordinal.vars <- c(
 "cinnost_exper",
 "cinnost_kateg",
 "cinnost_vyvoj")
-
 # u ordinálních veličin musíme správně nastavit uspořádání jejich hodnot
+my[[ordinal.vars[1]]] <- ordered(my[[ordinal.vars[1]]], 
+                                  levels = c("18–24","25–34","35–44","45–54","55–64","65 a více"))
+my[[ordinal.vars[2]]] <- ordered(my[[ordinal.vars[2]]], 
+                                  levels = c("Méně než 5 let","5–9 let","10–19 let","20 a více let"))
+my[[ordinal.vars[3]]] <- ordered(my[[ordinal.vars[3]]], 
+                                  levels = c("Bc.","Mgr./Ing.","CSc./Ph.D.","Docent","DrSc./DSc.","Profesor"))
+my[[ordinal.vars[4]]] <- ordered(my[[ordinal.vars[4]]], 
+                                  levels = c("Do 100","Do 500","Do 1000","Do 5000","Více"))
+for (i in 5:6){
+  my[!is.na(my[,ordinal.vars[i]]) & my[,ordinal.vars[i]]=="Nevím", ordinal.vars[5]] <- NA
+  my[[ordinal.vars[i]]] <- ordered(my[[ordinal.vars[i]]], 
+                                    levels = c("10%","20%","30%","40%","50%","60%","70%","80%","90%","100%"))
+}
+for (i in 7:12){
+  my[[ordinal.vars[i]]] <- ordered(my[[ordinal.vars[i]]], 
+                                    levels = c("1. místo","2. místo","3. místo","Tuto činnost nedělám"))
+}
+
+boolean.vars <- c(
+  "gender",
+  "kar_nejlepsi")
+
 # Velmi složité najít uspořádání u veličiny kar_kategorie, která má 27 různých hodnot
+complicated.vars <- c(
+  "kar_kategorie")
 
+# zbylé veličiny jsou kategorické 
+categorical.vars <- setdiff(explanatory.vars,union(likert.vars,union(ordinal.vars,union(boolean.vars,complicated.vars))))
 
+# learning multinomial regression model
+library(nnet)
+# Combine all predictor variables
+all.predictors <- c(likert.vars, ordinal.vars, boolean.vars, categorical.vars)
+# Create formula using reformulate
+formula <- reformulate(termlabels = all.predictors, response = dependent.var)
+
+# Fit multinomial logistic regression
+model <- multinom(formula, data = my, decay = 0.01, # L2 penalty parameter 
+                  maxit = 1000, weights = # Increase iterations
+                  
+                  )
+model_frame_used <- model.frame(model)
+# Now we can see it uses only 260 data vectors, which is much less than nrow(my), which is 878.
+print(nrow(model_frame_used))
+# multinom doesn't have an option for variable-specific sample sizes. 
+# This is a fundamental limitation of how regression models work. 
+# Multiple imputation is the proper statistical solution to use all available information while maintaining valid inference, use e.g. mice ...
+# or we can remove variables with too much missingness rather than rows
+missing_pct <- my %>%
+  select(all_of(all_predictors)) %>%
+  summarise_all(~mean(is.na(.)) * 100)
+# Keep only variables with <10% missing
+good_vars <- names(missing_pct)[missing_pct < 10]
+# These are variables that are frequently missing
+print(setdiff(all.predictors,good_vars))
+formula_reduced <- reformulate(termlabels = good_vars, response = dependent.var)
+# Fit multinomial logistic regression
+model <- multinom(formula_reduced, data = my, decay = 0.01, # L2 penalty parameter 
+                  maxit = 1000, weights = # Increase iterations
+                  )
+model_frame_used <- model.frame(model)
+# Now we can see it uses only 747 data vectors, which is not so much less than nrow(my), which is 878.
+print(nrow(model_frame_used))
+actual_y <- model.response(model_frame_used)
+# Create model matrix for glmnet
+X <- model.matrix(terms(model_frame_used), model_frame_used)[, -1]
+# Fit glmnet  
+cv_glmnet <- cv.glmnet(X, actual_y, family = "multinomial", alpha = 1)
+glmnet_model <- glmnet(X, actual_y, family = "multinomial", lambda = cv_glmnet$lambda.min)
+
+  # View results
+  summary(model)
+  # Get coefficients
+  coef(model)
+  # Predict probabilities
+  predicted_probs <- predict(model, type = "probs")
+  # Make predictions
+  predictions <- predict(model, type = "class")
+  # compare predictions with actual values in data
+  library(caret)
+  cm <- confusionMatrix(data = predictions, reference = as.factor(actual_y))
+  print(cm)
+  
+  # View results
+  summary(glmnet_model)
+  # Get coefficients
+  coef(glmnet_model)
+  # 1. CLASS PREDICTIONS (most common for confusion matrix)
+  class_pred <- predict(glmnet_model, newx = X, s = cv_glmnet$lambda.min, type = "class")
+  class_pred_factor <- as.factor(class_pred[, 1])
+  # Result: matrix with 1 column containing factor levels
+  # 2. PROBABILITY PREDICTIONS
+  prob_pred <- predict(glmnet_model, newx = X, s = cv_glmnet$lambda.min, type = "response")
+  prob_matrix <- prob_pred[, , 1]  # Extract the probability matrix
+  # Result: array with probabilities for each class
+  # Get class names
+  class_names <- dimnames(prob_matrix)[[2]]
+  # compare predictions with actual values in data
+  library(caret)
+  class_pred_factor <- factor(class_pred_factor, levels = levels(actual_y))
+  cm <- confusionMatrix(data = class_pred_factor, reference = as.factor(actual_y))
+  print(cm)
+    
+library(dplyr)
+library(randomForest)
+
+source("functions.R")
+# Apply the importance functions
+var_importance_all <- get_variable_importance(multinom_model=model, glmnet_model=glmnet_model, 
+                                              X=X, y=actual_y, original_vars=good_vars)
+print("Comprehensive Variable Importance:")
+print(var_importance_all[, c("Variable", "Composite_Importance", "Multinom_Importance", "Glmnet_Importance", "RF_Importance")])
+
+# Group by original variables
+grouped_importance <- group_variable_importance(
+  data.frame(Variable = var_importance_all$Variable, 
+            Importance = var_importance_all$Composite_Importance),
+  all_predictors
+)
+
+print("\nGrouped by Original Variables:")
+print(grouped_importance)
 
 ```
 
