@@ -153,10 +153,10 @@ for (i in 7:12){
 }
 
 boolean.vars <- c(
-  "gender",
   "kar_nejlepsi")
 
-# Velmi složité najít uspořádání u veličiny kar_kategorie, která má 27 různých hodnot
+# Velmi složité najít uspořádání u veličiny kar_kategorie, která má 27 různých hodnot.
+# Nebudeme ji používat.
 complicated.vars <- c(
   "kar_kategorie")
 
@@ -173,8 +173,12 @@ formula <- reformulate(termlabels = all.predictors, response = dependent.var)
 # Fit multinomial logistic regression
 model <- multinom(formula, data = my, decay = 0.01, # L2 penalty parameter 
                   maxit = 1000, weights = # Increase iterations
-                  
                   )
+library(effects)
+# Create effect plot for variable "vek"
+age_effect <- Effect("vek", model)
+plot(age_effect, style = "stacked")  # or "lines" for separate lines
+
 model_frame_used <- model.frame(model)
 # Now we can see it uses only 260 data vectors, which is much less than nrow(my), which is 878.
 print(nrow(model_frame_used))
@@ -198,11 +202,6 @@ model_frame_used <- model.frame(model)
 # Now we can see it uses only 747 data vectors, which is not so much less than nrow(my), which is 878.
 print(nrow(model_frame_used))
 actual_y <- model.response(model_frame_used)
-# Create model matrix for glmnet
-X <- model.matrix(terms(model_frame_used), model_frame_used)[, -1]
-# Fit glmnet  
-cv_glmnet <- cv.glmnet(X, actual_y, family = "multinomial", alpha = 1)
-glmnet_model <- glmnet(X, actual_y, family = "multinomial", lambda = cv_glmnet$lambda.min)
 
   # View results
   summary(model)
@@ -216,7 +215,15 @@ glmnet_model <- glmnet(X, actual_y, family = "multinomial", lambda = cv_glmnet$l
   library(caret)
   cm <- confusionMatrix(data = predictions, reference = as.factor(actual_y))
   print(cm)
-  
+  print.cfM(cm$table, file="cfM-mlr.pdf")
+
+# Create model matrix for glmnet
+X <- model.matrix(terms(model_frame_used), model_frame_used)[, -1]
+# Fit glmnet 
+library(glmnet)
+cv_glmnet <- cv.glmnet(X, actual_y, family = "multinomial", alpha = 1)
+glmnet_model <- glmnet(X, actual_y, family = "multinomial", lambda = cv_glmnet$lambda.min)
+
   # View results
   summary(glmnet_model)
   # Get coefficients
@@ -235,8 +242,15 @@ glmnet_model <- glmnet(X, actual_y, family = "multinomial", lambda = cv_glmnet$l
   library(caret)
   class_pred_factor <- factor(class_pred_factor, levels = levels(actual_y))
   cm <- confusionMatrix(data = class_pred_factor, reference = as.factor(actual_y))
-  print(cm)
-    
+  print.cfM(cm$table, file="cfM-glmnet.pdf")
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r}
 library(dplyr)
 library(randomForest)
 
@@ -257,14 +271,6 @@ grouped_importance <- group_variable_importance(
 print("\nGrouped by Original Variables:")
 print(grouped_importance)
 
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

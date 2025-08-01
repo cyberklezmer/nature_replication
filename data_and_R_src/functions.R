@@ -93,3 +93,16 @@ group_variable_importance <- function(importance_df, original_vars) {
   return(grouped_importance)
 }
 
+# print confusion matrix
+print.cfM <- function(cfM,file="confusion-matrix.pdf", limits=c(0,max(cfM)), title=""){
+  dat2 <- as_tibble(reshape2::melt(cfM)) # converting data to tibble
+    ggplot(dat2, aes(Prediction, Reference)) + 
+      ggtitle(title) +
+      geom_tile(aes(fill = value)) +
+      geom_text(aes(label = round(value))) +
+      # scale_fill_gradient(low = "white", high = "red", transform = "pseudo_log",limits=limits) +
+      scale_fill_gradient(low = "white", high = "red", limits=limits) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0.5), legend.text = element_text(size=5))  
+    ggsave(file)
+}
+
