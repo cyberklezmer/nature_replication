@@ -243,6 +243,10 @@ plot(basic_research_effect, style = "stacked")  # or "lines" for separate lines
 
 
 ```
+```{r}
+mosaicplot(table(my[,c("vek", dependent.var)]),col = c(4,6,7,8),main="", dir=c("h","v"), las=1)
+mosaicplot(table(my[,c("pomer_zakladni", dependent.var)]),col = c(4,6,7,8),main="", dir=c("h","v"), las=1)
+```
 
 
 ```{r}
