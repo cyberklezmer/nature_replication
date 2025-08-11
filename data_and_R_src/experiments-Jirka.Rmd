@@ -20,7 +20,7 @@ library(tibble)
 library(ggplot2)
 library(ggrepel)
 library(knitr)
-
+source("functions.R")
 
 ```
 ## R Markdown
@@ -43,7 +43,6 @@ b) dále Sociodemografické faktory
 c) Akademická kariéra (Ot 41-48), případně i další otázky: č. 50 podíl základního výzkumu u respondenta, pří. Ot: 49 - podíl věd činnosti u respondenta, Ot 50 - podíl zákl/apl výzkumu, které by tam mohly spadat 
 Metoda: MLR, multinomial log. regression?
 
-
 ```{r}
 # load("../data_src/dataAll.RData")
 load("../data_and_R_src/dataAll.RData")
@@ -51,13 +50,25 @@ complete = data
 # the same filter as in nature.Rmd
 my = filter(complete, cas_sec >= 600, zakl_vyzkum == "Ano")
 # which gives 878 respondents
+```
 
+Variables classification into following groups:
+- one dependent variable "krize_rep"
+- explanatory variables:
+  - Likert
+  - ordinal
+  - Boolean
+  - categorical
+  - complicated (will be ignored)
+  - other variables (will be ignored)
+
+```{r}
 dependent.var <- "krize_rep"
-barplot(table(my[,dependen.var]))
-
 # If we want to make dependent variable ordinal
 my[[dependent.var]] <- ordered(my[[dependent.var]],
                               levels = c("Ano, významná krize","Ano, nevýznamná krize","Nevím","Ne, žádná krize není"))
+  barplot(table(my[,dependent.var]),cex.names = 0.8)
+
 explanatory.vars <- c(
 "spec_hlavni",
 "gender",           
@@ -114,6 +125,7 @@ for (i in 1:(length(likert.vars)-1)){
   my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
                                   levels = c("Rozhodně ne", "Spíše ne", "Nevím", "Spíše ano", "Rozhodně ano"))
 }
+# the last Likert variable has different states
 i <- length(likert.vars)
 my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
                                   levels = c("„Měkčí“ (méně exaktní)", "Nedokážu posoudit", "„Tvrdší“ (exaktnější)"))
@@ -163,6 +175,11 @@ complicated.vars <- c(
 # zbylé veličiny jsou kategorické 
 categorical.vars <- setdiff(explanatory.vars,union(likert.vars,union(ordinal.vars,union(boolean.vars,complicated.vars))))
 
+```
+
+Multinomial Regression using nnet package 
+
+```{r}
 # learning multinomial regression model
 library(nnet)
 # Combine all predictor variables
@@ -174,25 +191,34 @@ formula <- reformulate(termlabels = all.predictors, response = dependent.var)
 model <- multinom(formula, data = my, decay = 0.01, # L2 penalty parameter 
                   maxit = 1000, weights = # Increase iterations
                   )
-library(effects)
-# Create effect plot for variable "vek"
-age_effect <- Effect("vek", model)
-plot(age_effect, style = "stacked")  # or "lines" for separate lines
+```
 
+The problem of this model is that it uses very few respondents for learning
+
+```{r}
 model_frame_used <- model.frame(model)
 # Now we can see it uses only 260 data vectors, which is much less than nrow(my), which is 878.
 print(nrow(model_frame_used))
 # multinom doesn't have an option for variable-specific sample sizes. 
 # This is a fundamental limitation of how regression models work. 
 # Multiple imputation is the proper statistical solution to use all available information while maintaining valid inference, use e.g. mice ...
-# or we can remove variables with too much missingness rather than rows
+```
+
+We remove variables with too much missingness rather than rows
+
+```{r}
 missing_pct <- my %>%
-  select(all_of(all_predictors)) %>%
+  select(all_of(all.predictors)) %>%
   summarise_all(~mean(is.na(.)) * 100)
 # Keep only variables with <10% missing
 good_vars <- names(missing_pct)[missing_pct < 10]
 # These are variables that are frequently missing
 print(setdiff(all.predictors,good_vars))
+```
+
+Now we learn model with variables that do not have high missingness
+
+```{r}
 formula_reduced <- reformulate(termlabels = good_vars, response = dependent.var)
 # Fit multinomial logistic regression
 model <- multinom(formula_reduced, data = my, decay = 0.01, # L2 penalty parameter 
@@ -201,6 +227,25 @@ model <- multinom(formula_reduced, data = my, decay = 0.01, # L2 penalty paramet
 model_frame_used <- model.frame(model)
 # Now we can see it uses only 747 data vectors, which is not so much less than nrow(my), which is 878.
 print(nrow(model_frame_used))
+```
+
+Ploting the influence of explanatory variables 
+
+```{r}
+library(effects)
+# Create effect plot for variable "vek"
+age_effect <- Effect("vek", model)
+plot(age_effect, style = "stacked")  # or "lines" for separate lines
+
+# Create effect plot for variable "pomer_zakladni"
+basic_research_effect <- Effect("pomer_zakladni", model)
+plot(basic_research_effect, style = "stacked")  # or "lines" for separate lines
+
+
+```
+
+
+```{r}
 actual_y <- model.response(model_frame_used)
 
   # View results
@@ -216,6 +261,11 @@ actual_y <- model.response(model_frame_used)
   cm <- confusionMatrix(data = predictions, reference = as.factor(actual_y))
   print(cm)
   print.cfM(cm$table, file="cfM-mlr.pdf")
+```
+
+Multinomial Regression using glmnet package 
+
+```{r}
 
 # Create model matrix for glmnet
 X <- model.matrix(terms(model_frame_used), model_frame_used)[, -1]
@@ -243,12 +293,8 @@ glmnet_model <- glmnet(X, actual_y, family = "multinomial", lambda = cv_glmnet$l
   class_pred_factor <- factor(class_pred_factor, levels = levels(actual_y))
   cm <- confusionMatrix(data = class_pred_factor, reference = as.factor(actual_y))
   print.cfM(cm$table, file="cfM-glmnet.pdf")
-
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
 
 ```{r}
 library(dplyr)
