@@ -240,12 +240,43 @@ plot(age_effect, style = "stacked")  # or "lines" for separate lines
 # Create effect plot for variable "pomer_zakladni"
 basic_research_effect <- Effect("pomer_zakladni", model)
 plot(basic_research_effect, style = "stacked")  # or "lines" for separate lines
-
-
 ```
+
+The mosaic plots directly from data
+
 ```{r}
-mosaicplot(table(my[,c("vek", dependent.var)]),col = c(4,6,7,8),main="", dir=c("h","v"), las=1)
-mosaicplot(table(my[,c("pomer_zakladni", dependent.var)]),col = c(4,6,7,8),main="", dir=c("h","v"), las=1)
+# Save current par settings
+old_par <- par(no.readonly = TRUE)
+# Adjust margins (bottom, left, top, right)
+par(mar = c(2, 2, 4, 2))  # Increase top margin
+
+var.names <- c("vek", "pomer_zakladni", "obor_tlak", "obor_dotovany", "kar_citace", "spec_hlavni")
+eng.var.names <- c("Age group", "Proportion of Basic Research", "Extraordinary Pressure to Achieve Results",
+                   "Heavily Subsidized Field", "Number of Citations", "Research Field")
+for (i in 1:length(var.names)){
+  var.name <- var.names[i]
+  eng.var.name <- eng.var.names[i]
+  fname <- paste(var.name,".pdf",sep="")
+  pdf(file=fname)
+    my.tab <- table(my[,c(var.name, dependent.var)])
+    colnames(my.tab) <- c("Yes, significant crisis", 
+                     "Yes, minor crisis", 
+                     "I don't know", 
+                     "No, there is no crisis")
+    if (var.name=="obor_tlak" | var.name=="obor_dotovany"){
+      rownames(my.tab) <- c("Definitely not", 
+                   "Rather not", 
+                   "I don't know", 
+                   "Rather yes", 
+                   "Definitely yes")
+    }
+    mosaicplot(my.tab,col = c(4,6,7,8),main="", dir=c("h","v"), las=2, 
+             xlab="Is there a replication crisis?", ylab=eng.var.name)
+  dev.off()
+}
+
+# Restore original settings
+par(old_par)
 ```
 
 
@@ -253,9 +284,9 @@ mosaicplot(table(my[,c("pomer_zakladni", dependent.var)]),col = c(4,6,7,8),main=
 actual_y <- model.response(model_frame_used)
 
   # View results
-  summary(model)
+  # summary(model)
   # Get coefficients
-  coef(model)
+  # coef(model)
   # Predict probabilities
   predicted_probs <- predict(model, type = "probs")
   # Make predictions
@@ -279,9 +310,9 @@ cv_glmnet <- cv.glmnet(X, actual_y, family = "multinomial", alpha = 1)
 glmnet_model <- glmnet(X, actual_y, family = "multinomial", lambda = cv_glmnet$lambda.min)
 
   # View results
-  summary(glmnet_model)
+  # summary(glmnet_model)
   # Get coefficients
-  coef(glmnet_model)
+  # coef(glmnet_model)
   # 1. CLASS PREDICTIONS (most common for confusion matrix)
   class_pred <- predict(glmnet_model, newx = X, s = cv_glmnet$lambda.min, type = "class")
   class_pred_factor <- as.factor(class_pred[, 1])
@@ -299,6 +330,21 @@ glmnet_model <- glmnet(X, actual_y, family = "multinomial", lambda = cv_glmnet$l
   print.cfM(cm$table, file="cfM-glmnet.pdf")
 ```
 
+```{r}
+dep.var.levels <- names(table(my[,dependent.var]))
+strong.vars <- c()
+for (level in dep.var.levels){
+  vars <- rownames(glmnet_model$beta[[level]])[which(abs(glmnet_model$beta[[level]])>0.3)]
+  strong.vars <- unique(c(strong.vars, vars))
+}
+print(strong.vars)
+```
+
+```{r}
+
+```
+
+Ordinal logistic regression
 
 ```{r}
 library(dplyr)
