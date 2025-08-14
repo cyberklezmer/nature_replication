@@ -263,7 +263,9 @@ all.predictors <- c(likert.vars, ordinal.vars, boolean.vars, categorical.vars)
 formula <- reformulate(termlabels = all.predictors, response = dependent.var)
 
 # Fit multinomial logistic regression
-model <- multinom(formula, data = my, decay = 0.01, # L2 penalty parameter 
+# decay = 0.01
+# decay = 1.8
+model <- multinom(formula, data = my, decay = 1.8, # L2 penalty parameter 
                   maxit = 1000, weights = # Increase iterations
                   )
 ```
@@ -299,7 +301,9 @@ Now we learn model with variables that do not have high missingness
 ```{r}
 formula_reduced <- reformulate(termlabels = good_vars, response = dependent.var)
 # Fit multinomial logistic regression
-model <- multinom(formula_reduced, data = my, decay = 0.01, # L2 penalty parameter 
+# decay = 0.01
+# decay = 1.8
+model <- multinom(formula_reduced, data = my, decay = 1.8, # L2 penalty parameter 
                   maxit = 1000, weights = # Increase iterations
                   )
 model_frame_used <- model.frame(model)
@@ -345,6 +349,137 @@ plot(age_effect, style = "stacked")  # or "lines" for separate lines
 # Create effect plot for variable "pomer_zakladni"
 basic_research_effect <- Effect("pomer_zakladni", model)
 plot(basic_research_effect, style = "stacked")  # or "lines" for separate lines
+```
+
+```{r}
+library(caret)
+set.seed(123)
+train_control<- trainControl(method="cv", number=10, savePredictions = TRUE)
+tune_grid <- expand.grid(decay = seq(0, 2, by = 0.2))
+model_10f <- train(formula_reduced, 
+                       data=my, 
+                       trControl=train_control, 
+                       method="multinom", 
+                       na.action = na.omit, 
+                       tuneGrid = tune_grid)
+# Look at the CV performance
+print(model_10f)
+model_10f$results
+
+# Look at the final model
+summary(model_10f$finalModel)
+
+# Variable importance from the CV model
+# varImp(olr_model_10f)
+# plot(varImp(olr_model_10f), top = 10)
+
+# Get predictions from finalModel (747 records)
+final_predictions <- predict(model_10f$finalModel)
+# The finalModel used 747 out of 806 records from trainingData
+# We need to figure out which 747 records were actually used
+training_data <- model_10f$trainingData
+# Check if there are any additional NAs that were removed
+complete_rows <- complete.cases(training_data[, -ncol(training_data)])  # Exclude .outcome column
+actual_outcomes <- training_data$.outcome[complete_rows]
+
+# Create confusion matrix
+cm <- confusionMatrix(final_predictions, actual_outcomes)
+print(cm)
+print.cfM(cm$table, file="cfM-mlr-10f.pdf")
+```
+
+Compute correlations between preecitions and actual outcomes
+
+```{r}
+spearman_cor <- cor(as.numeric(final_predictions), as.numeric(actual_outcomes), 
+                    method = "spearman")
+print(paste("Spearman correlation:", round(spearman_cor, 3)))
+
+pearson_cor <- cor(as.numeric(final_predictions), as.numeric(actual_outcomes), 
+                    method = "pearson")
+print(paste("Pearson  correlation:", round(pearson_cor, 3)))
+
+```
+
+
+The variables imporatance analysis
+
+```{r}
+# Run the complete analysis
+analysis <- analyze_multinom_importance(model_10f$finalModel)
+
+# Display the summary plot (aggregated importance)
+print(analysis$summary_plot)
+
+# Display the detailed coefficient plot
+print(analysis$detailed_plot)
+
+# View the importance summary table
+View(analysis$importance)
+
+# View all coefficients and p-values
+View(analysis$results)
+```
+
+
+```{r}
+# Install if needed
+# install.packages("ggeffects")
+library(ggeffects)
+
+# Create marginal effects
+age_effect <- ggpredict(model_10f$finalModel, terms = "vek")
+plot(age_effect)
+
+# For multiple variables
+multi_effects <- ggpredict(model_10f$finalModel, terms = c("vek", "some_other_var"))
+plot(multi_effects)
+```
+
+
+```{r}
+library(car)
+library(ggplot2)
+library(dplyr)
+
+# Get Anova results
+anova_results <- Anova(model_10f$finalModel, type = "II")
+
+# Create data frame with variable names and importance
+importance_df <- data.frame(
+  FullTerm = rownames(anova_results),
+  Importance = anova_results$`LR Chisq`,
+  P_value = anova_results$`Pr(>Chisq)`
+)
+
+# Clean variable names: remove backticks AND polynomial terms
+importance_df$BaseVariable <- gsub("`", "", importance_df$FullTerm)  # Remove backticks first
+importance_df$BaseVariable <- gsub("\\.L|\\.Q|\\.C|\\^[0-9]+", "", importance_df$BaseVariable)  # Then remove polynomial terms
+
+# Aggregate by base variable (sum the chi-square statistics)
+combined_importance <- importance_df %>%
+  group_by(BaseVariable) %>%
+  summarise(
+    TotalImportance = sum(Importance),
+    MinPValue = min(P_value),
+    NumTerms = n(),  # Number of polynomial terms combined
+    .groups = 'drop'
+  ) %>%
+  arrange(desc(TotalImportance))
+
+# Plot combined importance
+top_n <- 10
+ggplot(combined_importance[1:top_n, ], 
+       aes(x = reorder(BaseVariable, TotalImportance), y = TotalImportance)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(x = "Variable", y = "Combined LR Chi-square", 
+       title = paste("Top", top_n, "Variables (Combined Polynomial Terms)")) +
+  theme_minimal()
+
+# Show the cleaned results
+print(head(combined_importance, 15))
+
 ```
 
 The mosaic plots of potentially significant variables directly from data
@@ -474,6 +609,7 @@ Caret package 10-fold cross-validation
 
 ```{r}
 library(caret)
+set.seed(123)
 train_control<- trainControl(method="cv", number=10, savePredictions = TRUE)
 olr_model_10f <- train(formula_reduced, data=my, trControl=train_control, method="polr", 
                        na.action = na.omit, tuneGrid = data.frame(method = "logistic"))
@@ -534,8 +670,9 @@ ggplot(combined_importance[1:top_n, ],
 
 # Show the cleaned results
 print(head(combined_importance, 15))
-
 ```
+
+
 ```{r}
 library(car)
 library(ggplot2)
@@ -660,6 +797,13 @@ print("Correlations by fold:")
 print(fold_correlations)
 print(paste("Mean Spearman correlation:", round(mean(fold_correlations$Spearman), 3)))
 print(paste("Mean Pearson correlation:", round(mean(fold_correlations$Pearson), 3)))
+
+# Confusion matrix from CV predictions
+cm <- confusionMatrix(simple_olr_model$pred$pred, simple_olr_model$pred$obs)
+print(cm)
+print.cfM(cm$table, file="cfM-simple-olr-10f.pdf")
+
+
 ```
 
 Multinomial Regression using glmnet package 
