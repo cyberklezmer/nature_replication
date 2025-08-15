@@ -251,6 +251,130 @@ for(var in c("vek", "kar_titul", "pomer_veda", "pomer_zakladni", "obor_tlak")) {
 
 my <- my_clean
 ```
+Correlation analysis
+
+```{r}
+# Better approach - separate treatment for different variable types
+library(psych)
+
+# Prepare the data
+my.vars.prepared <- my.vars
+
+# Convert ordered factors to numeric (these are ordinal)
+ordered_vars <- sapply(my.vars.prepared, is.ordered)
+for(var in names(my.vars.prepared)[ordered_vars]) {
+  my.vars.prepared[[var]] <- as.numeric(my.vars.prepared[[var]])
+}
+
+# Handle character variables
+# kar_nejlepsi: binary variable (Ano/Ne)
+if("kar_nejlepsi" %in% names(my.vars.prepared)) {
+  my.vars.prepared$kar_nejlepsi <- as.numeric(as.factor(my.vars.prepared$kar_nejlepsi))
+}
+
+# spec_hlavni: nominal categorical (10 levels) - might want to exclude from correlation
+# gender: nominal categorical (3 levels)
+if("gender" %in% names(my.vars.prepared)) {
+  my.vars.prepared$gender <- as.numeric(as.factor(my.vars.prepared$gender))
+}
+
+# You might want to exclude spec_hlavni since it's purely nominal with many categories
+my.vars.for_cor <- my.vars.prepared[, !names(my.vars.prepared) %in% "spec_hlavni"]
+
+print("Variables for correlation analysis:")
+print(names(my.vars.for_cor))
+
+# Compute correlation matrix
+cor_matrix <- cor(my.vars.for_cor, use = "complete.obs")
+print("Correlation matrix:")
+print(round(cor_matrix, 3))
+
+# Create a more readable correlation matrix
+library(corrplot)
+
+# Compute correlations
+cor_matrix <- cor(my.vars.for_cor, use = "pairwise.complete")
+# Reorder the correlation matrix to put krize_rep first
+desired_order <- c("krize_rep", setdiff(colnames(cor_matrix), "krize_rep"))
+cor_matrix <- cor_matrix[desired_order, desired_order]
+
+# Visualize the correlation matrix
+corrplot(cor_matrix, method = "color", type = "upper", 
+         diag = FALSE, # Explicitly exclude diagonal
+         tl.cex = 0.8, tl.col = "black", order="original")
+
+# Or create a simple heatmap
+# Create heatmap with smaller labels
+heatmap(cor_matrix, 
+        symm = TRUE,
+        cexRow = 0.4,     # Row label size (smaller = more readable)
+        cexCol = 0.4,     # Column label size
+        margins = c(10, 10), # Increase margins to fit labels
+        Rowv = NA,        # Disable row clustering
+        Colv = NA)  # Disable column clustering
+
+```
+
+The Fruchterman-Reingold algorithm visualizing correlation networks
+
+```{r}
+library(igraph)
+
+# Set threshold
+threshold <- 0.15
+
+library(igraph)
+
+# Create adjacency matrix with ABSOLUTE values
+adj_matrix <- abs(cor_matrix_ordered)
+adj_matrix[adj_matrix < threshold] <- 0
+diag(adj_matrix) <- 0
+
+# Create graph
+cor_graph <- graph_from_adjacency_matrix(adj_matrix, 
+                                        mode = "undirected", 
+                                        weighted = TRUE)
+
+# Get edge list and extract original correlation values
+edge_list <- get.edgelist(cor_graph)
+original_correlations <- sapply(1:nrow(edge_list), function(i) {
+  v1 <- edge_list[i, 1]
+  v2 <- edge_list[i, 2]
+  return(cor_matrix_ordered[v1, v2])
+})
+
+# Add original correlations as edge attribute
+E(cor_graph)$original_cor <- original_correlations
+
+# Apply Fruchterman-Reingold layout
+set.seed(123)
+fr_layout <- layout_with_fr(cor_graph)
+
+# Plot with edge width proportional to correlation strength
+plot(cor_graph,
+     layout = fr_layout,
+     vertex.size = 12,
+     vertex.color = ifelse(V(cor_graph)$name == "krize_rep", "gold", "lightsteelblue"),
+     vertex.label.cex = 0.6,
+     vertex.label.color = "black",
+     edge.width = abs(E(cor_graph)$original_cor) * 8,  # Width based on absolute correlation
+     edge.color = ifelse(E(cor_graph)$original_cor > 0, "red", "blue"),
+     main = "Correlation Network - Edge Width = Correlation Strength")
+
+legend("topright", 
+       legend = c("Positive correlation", "Negative correlation", "Thicker = Stronger"),
+       col = c("red", "blue", "black"),
+       lty = c(1, 1, 1),
+       lwd = c(2, 2, 4),
+       cex = 0.8)
+
+```
+
+BN structure learning
+
+```{r}
+
+```
 
 Multinomial Regression using nnet package 
 
@@ -266,7 +390,7 @@ formula <- reformulate(termlabels = all.predictors, response = dependent.var)
 # decay = 0.01
 # decay = 1.8
 model <- multinom(formula, data = my, decay = 1.8, # L2 penalty parameter 
-                  maxit = 1000, weights = # Increase iterations
+                  maxit = 1000 # Increase iterations
                   )
 ```
 
@@ -304,7 +428,7 @@ formula_reduced <- reformulate(termlabels = good_vars, response = dependent.var)
 # decay = 0.01
 # decay = 1.8
 model <- multinom(formula_reduced, data = my, decay = 1.8, # L2 penalty parameter 
-                  maxit = 1000, weights = # Increase iterations
+                  maxit = 1000 # Increase iterations
                   )
 model_frame_used <- model.frame(model)
 # Now we can see it uses only 747 data vectors, which is not so much less than nrow(my), which is 878.
@@ -329,16 +453,89 @@ actual_y <- model.response(model_frame_used)
   print.cfM(cm$table, file="cfM-mlr.pdf")
 ```
 
-Quick systematic approach to find significance of variables
+Quick systematic approach to find significance of variables using the model likelihood ratio (LR)
+Note: 
+for decay=1.8 found by caret 10F CV no variable is significant 
+for decay=0 two variables are significant: obor_rychly and vek
 
 ```{r}
-library(car)
-print("Significance of all variables:")
-Anova(model, type = "II")
+
+# Enhanced version with significance stars
+test_variable_significance_enhanced <- function(full_model, data, decay=1.8) {
+  # Get all variables used in the model
+  model_vars <- all.vars(formula(full_model))
+  complete_data <- data[complete.cases(data[, model_vars]), ]
+  
+  print(paste("Using", nrow(complete_data), "complete observations out of", nrow(data)))
+  
+  # Refit full model on complete data
+  full_model_complete <- multinom(formula(full_model), data = complete_data, trace = FALSE, 
+                                  decay = decay, # L2 penalty parameter 
+                                  maxit = 1000 # Increase iterations
+  )
+  full_loglik <- logLik(full_model_complete)
+  
+  # Get predictor variables (excluding response)
+  response_var <- all.vars(formula(full_model))[1]
+  predictor_vars <- setdiff(all.vars(formula(full_model)), response_var)
+  
+  results <- data.frame(
+    Variable = character(),
+    LR_Chisq = numeric(),
+    Df = numeric(),
+    P_value = numeric(),
+    Significance = character(),
+    stringsAsFactors = FALSE
+  )
+  
+  for (var in predictor_vars) {
+    cat("Testing variable:", var, "\n")
+    
+    # Fit reduced model on the SAME complete data
+    reduced_formula <- update(formula(full_model), paste("~ . -", var))
+    reduced_model <- multinom(reduced_formula, data = complete_data, trace = FALSE,
+                              decay = decay, # L2 penalty parameter 
+                              maxit = 1000 # Increase iterations
+    )
+    reduced_loglik <- logLik(reduced_model)
+    
+    # Calculate LR statistic
+    lr_stat <- -2 * (as.numeric(reduced_loglik) - as.numeric(full_loglik))
+    df_diff <- attr(full_loglik, "df") - attr(reduced_loglik, "df")
+    p_value <- pchisq(lr_stat, df = df_diff, lower.tail = FALSE)
+    
+    # Add significance stars
+    sig_stars <- ifelse(p_value < 0.001, "***",
+                 ifelse(p_value < 0.01, "**",
+                 ifelse(p_value < 0.05, "*",
+                 ifelse(p_value < 0.1, ".", ""))))
+    
+    results <- rbind(results, data.frame(
+      Variable = var,
+      LR_Chisq = round(lr_stat, 3),
+      Df = df_diff,
+      P_value = round(p_value, 5),
+      Significance = sig_stars
+    ))
+  }
+  
+  # Order by p-value (ascending)
+  results <- results[order(results$P_value), ]
+  
+  # Reset row names
+  rownames(results) <- NULL
+  
+  return(results)
+}
+
+print("Output with significance indicators:")
+enhanced_results <- test_variable_significance_enhanced(model, my, decay=0)
+print(enhanced_results)
+print("Significance codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1")
 
 ```
 
-Plotting the influence of explanatory variables 
+Plotting the influence of explanatory variables as represented in the learned model
 
 ```{r}
 library(effects)
@@ -490,9 +687,9 @@ old_par <- par(no.readonly = TRUE)
 # Adjust margins (bottom, left, top, right)
 par(mar = c(2, 2, 4, 2))  # Increase top margin
 
-var.names <- c("vek", "pomer_zakladni", "obor_tlak", "obor_dotovany", "kar_citace", "spec_hlavni", "kar_titul", "obor_medializ")
+var.names <- c("vek", "pomer_zakladni", "obor_tlak", "obor_dotovany", "kar_citace", "spec_hlavni", "kar_titul", "obor_medializ", "obor_rychly")
 eng.var.names <- c("Age group", "Proportion of Basic Research", "Extraordinary Pressure to Achieve Results",
-                   "Heavily Subsidized Field", "Number of Citations", "Research Field", "Professional Degree", "Highly visible field")
+                   "Heavily Subsidized Field", "Number of Citations", "Research Field", "Professional Degree", "Highly visible field","Rapidly Changing Field")
 for (i in 1:length(var.names)){
   var.name <- var.names[i]
   eng.var.name <- eng.var.names[i]
@@ -509,7 +706,7 @@ for (i in 1:length(var.names)){
                    "Rather yes", 
                    "Definitely yes")
     }
-    if (var.name=="obor_dotovany" | var.name=="obor_medializ"){
+    if (var.name=="obor_dotovany" | var.name=="obor_medializ" | var.name=="obor_rychly"){
       rownames(my.tab) <- c("Definitely not", 
                    "Rather not", 
                    "I don't know", 
