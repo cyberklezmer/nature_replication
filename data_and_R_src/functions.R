@@ -305,6 +305,15 @@ analyze_multinom_importance <- function(multinom_model, top_n_detailed = 15, top
   detailed_plot <- plot_detailed_coefficients(results, top_n_detailed)
   summary_plot <- plot_variable_importance(importance, top_n_summary)
   
+  pdf(file="mlr-analysis-importance.pdf", width = 12, height = 8)
+    old_par <- par(no.readonly = TRUE)
+    current_mar <- par("mar")
+    par(mar = c(current_mar[1], current_mar[2], current_mar[3], 20))  # Increase right margin to 8
+    plot(summary_plot)
+    # Restore original settings
+    par(old_par)
+  dev.off()
+  
   # Print summary table
   cat("\nTop 10 Most Important Variables:\n")
   print(importance %>% 

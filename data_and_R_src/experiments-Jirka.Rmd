@@ -175,6 +175,16 @@ complicated.vars <- c(
 # zbylé veličiny jsou kategorické 
 categorical.vars <- setdiff(explanatory.vars,union(likert.vars,union(ordinal.vars,union(boolean.vars,complicated.vars))))
 
+# For spec_hlavni - create shorter, cleaner names
+my$spec_hlavni <- factor(my$spec_hlavni,
+                         levels = c("Chemistry", "Biology", "Engineering", "Medicine", 
+                                    "Mathematics", "Other specialization", "Materials Science", 
+                                    "Physics", "Earth and Environmental Science", 
+                                    "Astronomy and Planetary Science"),
+                         labels = c("Chemistry", "Biology", "Engineering", "Medicine", 
+                                    "Mathematics", "Other", "Materials", 
+                                    "Physics", "Earth_Env", "Astronomy"))
+
 # Set treatment contrasts also for ordered factors
 # options(contrasts = c("contr.treatment", "contr.treatment"))
 # This is the default:
@@ -273,6 +283,10 @@ if("kar_nejlepsi" %in% names(my.vars.prepared)) {
 }
 
 # spec_hlavni: nominal categorical (10 levels) - might want to exclude from correlation
+# if("spec_hlavni" %in% names(my.vars.prepared)) {
+#   my.vars.prepared$spec_hlavni <- as.numeric(as.factor(my.vars.prepared$spec_hlavni))
+# }
+
 # gender: nominal categorical (3 levels)
 if("gender" %in% names(my.vars.prepared)) {
   my.vars.prepared$gender <- as.numeric(as.factor(my.vars.prepared$gender))
@@ -299,9 +313,11 @@ desired_order <- c("krize_rep", setdiff(colnames(cor_matrix), "krize_rep"))
 cor_matrix <- cor_matrix[desired_order, desired_order]
 
 # Visualize the correlation matrix
+pdf(file="correlation-matrix.pdf")
 corrplot(cor_matrix, method = "color", type = "upper", 
          diag = FALSE, # Explicitly exclude diagonal
          tl.cex = 0.8, tl.col = "black", order="original")
+dev.off()
 
 # Or create a simple heatmap
 # Create heatmap with smaller labels
@@ -350,6 +366,7 @@ E(cor_graph)$original_cor <- original_correlations
 set.seed(123)
 fr_layout <- layout_with_fr(cor_graph)
 
+pdf(file="correlation-graph.pdf")
 # Plot with edge width proportional to correlation strength
 plot(cor_graph,
      layout = fr_layout,
@@ -359,7 +376,7 @@ plot(cor_graph,
      vertex.label.color = "black",
      edge.width = abs(E(cor_graph)$original_cor) * 8,  # Width based on absolute correlation
      edge.color = ifelse(E(cor_graph)$original_cor > 0, "red", "blue"),
-     main = "Correlation Network - Edge Width = Correlation Strength")
+     main = "Correlation Network (Fruchterman-Reingold Layout)")
 
 legend("topright", 
        legend = c("Positive correlation", "Negative correlation", "Thicker = Stronger"),
@@ -367,14 +384,394 @@ legend("topright",
        lty = c(1, 1, 1),
        lwd = c(2, 2, 4),
        cex = 0.8)
+dev.off()
 
 ```
+Correlation including Halm's correction
+
+```{r}
+# Load required libraries
+library(corrplot)
+library(igraph)
+library(Hmisc)  # Alternative approach
+library(psych)  # Another alternative
+
+# First, check and clean the data
+print("Checking data structure:")
+print(str(my.vars.for_cor))
+print("Class of object:")
+print(class(my.vars.for_cor))
+
+# Convert tibble to regular data frame
+if("tbl_df" %in% class(my.vars.for_cor)) {
+  cat("Converting tibble to data frame...\n")
+  my.vars.for_cor <- as.data.frame(my.vars.for_cor)
+} else if(is.list(my.vars.for_cor) && !is.data.frame(my.vars.for_cor)) {
+  cat("Converting list to data frame...\n")
+  my.vars.for_cor <- as.data.frame(my.vars.for_cor)
+} else if(is.matrix(my.vars.for_cor)) {
+  cat("Converting matrix to data frame...\n")
+  my.vars.for_cor <- as.data.frame(my.vars.for_cor)
+}
+
+print("After conversion:")
+print(class(my.vars.for_cor))
+print("Data types:")
+print(sapply(my.vars.for_cor, class))
+
+# Keep only numeric columns
+numeric_cols <- sapply(my.vars.for_cor, is.numeric)
+if(sum(numeric_cols) == 0) {
+  stop("No numeric columns found in the dataset!")
+}
+
+if(sum(!numeric_cols) > 0) {
+  cat("Removing non-numeric columns:", paste(names(my.vars.for_cor)[!numeric_cols], collapse = ", "), "\n")
+  my.vars.for_cor <- my.vars.for_cor[, numeric_cols, drop = FALSE]
+}
+
+# Remove columns with zero variance (constant values)
+zero_var_cols <- sapply(my.vars.for_cor, function(x) var(x, na.rm = TRUE) == 0 | is.na(var(x, na.rm = TRUE)))
+if(sum(zero_var_cols) > 0) {
+  cat("Removing zero-variance columns:", paste(names(my.vars.for_cor)[zero_var_cols], collapse = ", "), "\n")
+  my.vars.for_cor <- my.vars.for_cor[, !zero_var_cols, drop = FALSE]
+}
+
+# Check for minimum number of complete observations
+complete_cases <- complete.cases(my.vars.for_cor)
+cat("Complete cases:", sum(complete_cases), "out of", nrow(my.vars.for_cor), "\n")
+
+if(sum(complete_cases) < 3) {
+  stop("Insufficient complete cases for correlation analysis!")
+}
+
+cat("Final dataset dimensions:", dim(my.vars.for_cor), "\n")
+cat("Final variables:", paste(names(my.vars.for_cor), collapse = ", "), "\n")
+
+# Method 1: Using cor.test with apply (most flexible)
+# Function to compute p-values for correlation matrix
+compute_cor_pvalues <- function(data) {
+  n_vars <- ncol(data)
+  cor_matrix <- cor(data, use = "complete.obs")
+  p_matrix <- matrix(NA, n_vars, n_vars)
+  colnames(p_matrix) <- colnames(data)
+  rownames(p_matrix) <- colnames(data)
+  
+  # Compute p-values for upper triangle
+  for(i in 1:(n_vars-1)) {
+    for(j in (i+1):n_vars) {
+      # Extract vectors and ensure they're numeric
+      x_vec <- as.numeric(data[,i])
+      y_vec <- as.numeric(data[,j])
+      
+      # Remove NA pairs
+      complete_pairs <- complete.cases(x_vec, y_vec)
+      
+      if(sum(complete_pairs) >= 3) {  # Need at least 3 observations
+        test_result <- cor.test(x_vec[complete_pairs], y_vec[complete_pairs])
+        p_matrix[i,j] <- test_result$p.value
+        p_matrix[j,i] <- test_result$p.value  # Mirror to lower triangle
+      } else {
+        p_matrix[i,j] <- 1  # Set p-value to 1 for insufficient data
+        p_matrix[j,i] <- 1
+      }
+    }
+  }
+  
+  # Diagonal is always 1 (perfect correlation), p-value = 0
+  diag(p_matrix) <- 0
+  
+  return(p_matrix)
+}
+
+# Compute correlation matrix and p-values
+cor_matrix <- cor(my.vars.for_cor, use = "complete.obs")
+p_matrix <- compute_cor_pvalues(my.vars.for_cor)
+
+# Method 2: Using Hmisc::rcorr (recommended - more robust)
+# Convert to matrix for rcorr
+data_matrix <- as.matrix(my.vars.for_cor)
+
+# Check if conversion worked
+if(!is.numeric(data_matrix)) {
+  cat("Matrix conversion failed. Attempting column-by-column conversion...\n")
+  for(i in 1:ncol(my.vars.for_cor)) {
+    my.vars.for_cor[,i] <- as.numeric(as.character(my.vars.for_cor[,i]))
+  }
+  data_matrix <- as.matrix(my.vars.for_cor)
+}
+
+result <- rcorr(data_matrix)
+cor_matrix <- result$r
+p_matrix <- result$P
+
+# Apply Holm correction to p-values
+# Extract upper triangle p-values (excluding diagonal)
+upper_tri_indices <- which(upper.tri(p_matrix), arr.ind = TRUE)
+p_values_vector <- p_matrix[upper.tri(p_matrix)]
+
+# Apply Holm correction
+p_adjusted <- p.adjust(p_values_vector, method = "holm")
+
+# Create adjusted p-value matrix
+p_matrix_adjusted <- p_matrix
+p_matrix_adjusted[upper.tri(p_matrix_adjusted)] <- p_adjusted
+p_matrix_adjusted[lower.tri(p_matrix_adjusted)] <- t(p_matrix_adjusted)[lower.tri(p_matrix_adjusted)]
+
+# Set significance threshold
+alpha <- 0.05
+# alpha <- 0.2
+
+# Create significance mask
+sig_mask <- p_matrix_adjusted < alpha
+
+# Filter correlation matrix based on significance
+cor_matrix_filtered <- cor_matrix * sig_mask
+
+# Optional: Set a minimum correlation threshold for network edges
+cor_threshold <- 0.15
+# cor_threshold <- 0.3  # Adjust as needed
+cor_matrix_filtered[abs(cor_matrix_filtered) < cor_threshold] <- 0
+
+# Create network graph for Fruchterman-Reingold algorithm
+# Convert correlation matrix to adjacency matrix (absolute values for undirected graph)
+adj_matrix <- abs(cor_matrix_filtered)
+
+# Remove diagonal (self-loops)
+diag(adj_matrix) <- 0
+
+# Create igraph object (weights will be automatically set from the adjacency matrix)
+network <- graph_from_adjacency_matrix(adj_matrix, 
+                                     mode = "undirected", 
+                                     weighted = TRUE, 
+                                     diag = FALSE)
+
+# The weights are already set correctly by graph_from_adjacency_matrix
+# But let's verify and set edge colors properly
+
+# Get the edge list to properly assign colors
+edge_list <- as_edgelist(network, names = FALSE)
+n_edges <- nrow(edge_list)
+
+# Create vectors to store edge attributes
+edge_weights <- numeric(n_edges)
+edge_colors <- character(n_edges)
+
+# For each edge, get the corresponding correlation value
+for(i in 1:n_edges) {
+  row_idx <- edge_list[i, 1]
+  col_idx <- edge_list[i, 2]
+  
+  # Get the original correlation value (with sign)
+  cor_value <- cor_matrix_filtered[row_idx, col_idx]
+  
+  # Set weight as absolute correlation
+  edge_weights[i] <- abs(cor_value)
+  
+  # Set color based on sign
+  edge_colors[i] <- ifelse(cor_value > 0, "red", "blue")
+}
+
+# Assign the attributes
+E(network)$weight <- edge_weights
+E(network)$color <- edge_colors
+
+# Apply Fruchterman-Reingold layout
+set.seed(123)  # For reproducible layout
+fr_layout <- layout_with_fr(network)
+
+pdf(file="correlation-graph-Holms-correction.pdf")
+# Plot the network
+plot(network, 
+     layout = fr_layout,
+     vertex.size = 12,
+     vertex.color = ifelse(V(cor_graph)$name == "krize_rep", "gold", "lightsteelblue"),
+     vertex.label.cex = 0.6,
+     vertex.label.color = "black",
+     edge.width = E(network)$weight * 8,  # Scale edge width by correlation strength
+     edge.color = E(network)$color,
+     main = "Correlation Network (Holm-corrected, Fruchterman-Reingold Layout)")
+
+# Add legend
+legend("topright", 
+       legend = c("Positive correlation", "Negative correlation", "Thicker = Stronger"),
+       col = c("red", "blue", "black"),
+       lty = c(1, 1, 1),
+       lwd = c(2, 2, 4),
+       cex = 0.8)
+dev.off()
+
+# Print summary statistics
+cat("Original correlations - significant pairs (before correction):", 
+    sum(p_matrix < alpha, na.rm = TRUE) / 2, "\n")
+cat("Holm-corrected - significant pairs:", 
+    sum(p_matrix_adjusted < alpha, na.rm = TRUE) / 2, "\n")
+cat("Network edges (after filtering):", ecount(network), "\n")
+cat("Network nodes:", vcount(network), "\n")
+
+# Optional: Save results
+# write.csv(cor_matrix, "correlation_matrix.csv")
+# write.csv(p_matrix_adjusted, "p_values_holm_corrected.csv")
+
+# View first few rows of results
+print("Correlation matrix (first 5x5):")
+print(round(cor_matrix[1:min(5,nrow(cor_matrix)), 1:min(5,ncol(cor_matrix))], 3))
+
+print("Holm-corrected p-values (first 5x5):")
+print(round(p_matrix_adjusted[1:min(5,nrow(p_matrix_adjusted)), 1:min(5,ncol(p_matrix_adjusted))], 4))
+
+```
+
 
 BN structure learning
 
 ```{r}
+library(bnlearn)
+my.vars.bn <- my.vars.for_cor
+# if we want to consider also this variable with 10 values
+my.vars.bn <- cbind(my.vars.for_cor, my.vars$spec_hlavni)
+colnames(my.vars.bn) <- c(colnames(my.vars.bn)[-length(colnames(my.vars.bn))],"spec_hlavni")
+
+# Convert all columns to factors at once
+my.vars.bn.discrete <- as.data.frame(lapply(my.vars.bn, as.factor))
+
+# Check the structure to confirm conversion
+str(my.vars.bn.discrete)
+
+library(dplyr)
+# Filter to only existing variables
+missing_pct <- my.vars.bn.discrete %>%
+  dplyr::select(all_of(names(my.vars.bn.discrete ))) %>%
+  summarise_all(~mean(is.na(.)) * 100)
+# Keep only variables with <10% missing
+good_vars <- names(missing_pct)[missing_pct < 10]
+# These are variables that are frequently missing
+print(setdiff(all.predictors,good_vars))
+
+# Remove columns with too many missing values first, then rows
+my.vars.bn.clean <- my.vars.bn.discrete[, good_vars]
+my.vars.bn.clean <- na.omit(my.vars.bn.clean)
+
+# Now we can learn the Bayesian network structure
+bn_structure <- hc(my.vars.bn.clean, score = "aic")
+# Number of edges for different scoring functions
+#   BIC (default): 28 edges
+#   AIC: 40 edges
+#   Log-likelihood: 288 edges
+
+# Plot the learned network
+plot(bn_structure)
+# amat(bn_structure)
+# To get more information about the learned network:
+arcs(bn_structure)  # Shows the directed edges
+# nodes(bn_structure) # Shows the nodes
+score(bn_structure, my.vars.bn.clean) # BIC score
+
+# Other structure learning algorithms:
+bn_structure_tabu <- tabu(my.vars.bn.clean)
+plot(bn_structure_tabu)
+#
+bn_structure_mmhc <- mmhc(my.vars.bn.clean)
+plot(bn_structure_mmhc)
+
 
 ```
+
+Visualization of learned Bayesian networks
+
+```{r}
+
+# Using DiagrammeR (modern alternative)
+# Install if needed: install.packages("DiagrammeR")
+if (requireNamespace("DiagrammeR", quietly = TRUE)) {
+  library(DiagrammeR)
+  
+  # Convert bnlearn network (including CPDAG) to DOT format
+  create_dot_bn <- function(bn_object, title = "Bayesian Network") {
+    nodes_list <- nodes(bn_object)
+    edges_list <- arcs(bn_object)
+    
+    # Identify undirected edges (edges that appear in both directions)
+    directed_edges <- data.frame()
+    undirected_edges <- data.frame()
+    processed_pairs <- character(0)
+    
+    if(nrow(edges_list) > 0) {
+      for(i in 1:nrow(edges_list)) {
+        from <- edges_list[i,1]
+        to <- edges_list[i,2]
+        pair_key <- paste(sort(c(from, to)), collapse = "_")
+        
+        if(!pair_key %in% processed_pairs) {
+          # Check if reverse edge exists
+          reverse_exists <- any(edges_list[,1] == to & edges_list[,2] == from)
+          
+          if(reverse_exists) {
+            # Undirected edge - add only once
+            undirected_edges <- rbind(undirected_edges, data.frame(from = from, to = to))
+          } else {
+            # Directed edge
+            directed_edges <- rbind(directed_edges, data.frame(from = from, to = to))
+          }
+          processed_pairs <- c(processed_pairs, pair_key)
+        }
+      }
+    }
+    
+    # Start DOT string
+    dot_string <- 'digraph BN {
+  graph [layout="dot", rankdir="TB", bgcolor="white"];
+  node [shape="ellipse", style="filled", fillcolor="lightsteelblue", 
+        color="navy", fontcolor="black", fontname="Arial", fontsize="12"];
+  
+'
+    
+    # Add nodes with labels
+    for(node in nodes_list) {
+      # Keep original node names with underscores
+      dot_string <- paste0(dot_string, '  "', node, '" [label="', node, '"];\n')
+    }
+    
+    dot_string <- paste0(dot_string, '\n')
+    
+    # Add directed edges
+    if(nrow(directed_edges) > 0) {
+      dot_string <- paste0(dot_string, '  // Directed edges\n')
+      for(i in 1:nrow(directed_edges)) {
+        dot_string <- paste0(dot_string, '  "', directed_edges[i,1], '" -> "', 
+                           directed_edges[i,2], '" [arrowhead="vee", color="darkblue", penwidth="2"];\n')
+      }
+    }
+    
+    # Add undirected edges
+    if(nrow(undirected_edges) > 0) {
+      dot_string <- paste0(dot_string, '\n  // Undirected edges\n')
+      for(i in 1:nrow(undirected_edges)) {
+        dot_string <- paste0(dot_string, '  "', undirected_edges[i,1], '" -> "', 
+                           undirected_edges[i,2], '" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];\n')
+      }
+    }
+    
+    dot_string <- paste0(dot_string, '}')
+    return(dot_string)
+  }
+  
+  # Create and render the graph
+  dot_graph <- create_dot_bn(cpdag(bn_structure))
+  print(grViz(dot_graph))
+  
+} else {
+  cat("DiagrammeR not available. Install with: install.packages('DiagrammeR')\n")
+}
+
+cpdag_structure <- cpdag(bn_structure)
+dot_content <- create_dot_bn(cpdag_structure)
+writeLines(dot_content, "network.dot")
+system('"C:/Program Files/Graphviz/bin/dot.exe" -Tpdf network.dot -o cpdag-of-bayesian-network.pdf')
+
+
+```
+
 
 Multinomial Regression using nnet package 
 
@@ -548,6 +945,8 @@ basic_research_effect <- Effect("pomer_zakladni", model)
 plot(basic_research_effect, style = "stacked")  # or "lines" for separate lines
 ```
 
+Tuning model parameters using 10-Fold Cross-Validation
+
 ```{r}
 library(caret)
 set.seed(123)
@@ -585,7 +984,7 @@ print(cm)
 print.cfM(cm$table, file="cfM-mlr-10f.pdf")
 ```
 
-Compute correlations between preecitions and actual outcomes
+Compute correlations between predictions and actual outcomes
 
 ```{r}
 spearman_cor <- cor(as.numeric(final_predictions), as.numeric(actual_outcomes), 
@@ -596,6 +995,230 @@ pearson_cor <- cor(as.numeric(final_predictions), as.numeric(actual_outcomes),
                     method = "pearson")
 print(paste("Pearson  correlation:", round(pearson_cor, 3)))
 
+```
+Model parameters
+
+```{r}
+multinom_model <- model_10f
+
+# Method 1: Basic coefficient extraction
+# Extract the final model from caret train object
+final_model <- multinom_model$finalModel
+
+# Get raw coefficients
+raw_coefficients <- coef(final_model)
+cat("Raw coefficient matrix:\n")
+print(raw_coefficients)
+cat("\nDimensions:", dim(raw_coefficients), "(rows = classes, columns = predictors)\n")
+
+# Method 2: Clean coefficient extraction with proper names
+# Get coefficient names
+coef_names <- colnames(raw_coefficients)
+class_names <- rownames(raw_coefficients)
+
+cat("\nCoefficient names:", paste(coef_names, collapse = ", "), "\n")
+cat("Class names:", paste(class_names, collapse = ", "), "\n")
+
+# Method 3: Convert to data frame for easier handling
+coef_df <- as.data.frame(raw_coefficients)
+coef_df$Class <- rownames(raw_coefficients)
+coef_df <- coef_df[, c("Class", setdiff(names(coef_df), "Class"))]
+
+cat("\nCoefficients as data frame:\n")
+print(coef_df)
+
+# Method 4: Long format for easier analysis/plotting
+library(tidyr)
+library(dplyr)
+
+coef_long <- coef_df %>%
+  pivot_longer(cols = -Class, names_to = "Predictor", values_to = "Coefficient") %>%
+  arrange(Class, Predictor)
+
+cat("\nCoefficients in long format (first 20 rows):\n")
+print(head(coef_long, 20))
+
+# Method 5: Get standard errors and compute significance
+model_summary <- summary(final_model)
+standard_errors <- model_summary$standard.errors
+z_values <- model_summary$coefficients / standard_errors
+p_values <- 2 * (1 - pnorm(abs(z_values)))
+
+# Create comprehensive coefficient table
+coef_detailed <- data.frame(
+  Class = rep(rownames(raw_coefficients), each = ncol(raw_coefficients)),
+  Predictor = rep(colnames(raw_coefficients), nrow(raw_coefficients)),
+  Coefficient = as.vector(t(raw_coefficients)),
+  Std_Error = as.vector(t(standard_errors)),
+  Z_value = as.vector(t(z_values)),
+  P_value = as.vector(t(p_values))
+)
+
+# Add significance stars
+coef_detailed$Significance <- cut(coef_detailed$P_value,
+                                 breaks = c(0, 0.001, 0.01, 0.05, 0.1, 1),
+                                 labels = c("***", "**", "*", ".", ""),
+                                 include.lowest = TRUE)
+
+cat("\nDetailed coefficient table (first 20 rows):\n")
+print(head(coef_detailed, 20))
+
+# Method 6: Calculate odds ratios and confidence intervals
+odds_ratios <- exp(raw_coefficients)
+cat("\nOdds ratios:\n")
+print(round(odds_ratios, 3))
+
+# Try to get confidence intervals (may not always work)
+tryCatch({
+  conf_intervals <- confint(final_model)
+  odds_ratio_ci <- exp(conf_intervals)
+  cat("\nConfidence intervals for odds ratios:\n")
+  print(round(odds_ratio_ci, 3))
+}, error = function(e) {
+  cat("Could not compute confidence intervals:", e$message, "\n")
+  
+  # Alternative: approximate CI using standard errors
+  cat("Computing approximate 95% confidence intervals...\n")
+  ci_lower <- raw_coefficients - 1.96 * standard_errors
+  ci_upper <- raw_coefficients + 1.96 * standard_errors
+  
+  # Convert to odds ratios
+  or_ci_lower <- exp(ci_lower)
+  or_ci_upper <- exp(ci_upper)
+  
+  cat("Odds ratio confidence intervals (approximate):\n")
+  cat("Lower bounds:\n")
+  print(round(or_ci_lower, 3))
+  cat("Upper bounds:\n")  
+  print(round(or_ci_upper, 3))
+})
+
+# Method 7: Visualize coefficients with improved text sizing and renamed classes
+library(ggplot2)
+
+# First, let's see what the current class names are
+current_classes <- unique(coef_long$Class)
+cat("Current class names:", paste(current_classes, collapse = ", "), "\n")
+
+class_mapping <- c(
+  "Ano, nevýznamná krize" = "Yes, minor crisis", 
+  "Ne, žádná krize není" = "No, there is no crisis", 
+  "Nevím" = "I don't know"
+)
+# Apply the mapping to data
+coef_long_renamed <- coef_long %>%
+  mutate(Class_Original = Class,  # Keep original for reference
+         Class = ifelse(Class %in% names(class_mapping), 
+                       class_mapping[Class], 
+                       Class))  # Use mapping if available, otherwise keep original
+# Update other data frames as well
+coef_detailed_renamed <- coef_detailed %>%
+  mutate(Class_Original = Class,
+         Class = ifelse(Class %in% names(class_mapping), 
+                       class_mapping[Class], 
+                       Class))
+# Show the mapping
+cat("Class name mapping:\n")
+mapping_df <- data.frame(
+  Original = names(class_mapping),
+  Renamed = class_mapping
+)
+print(mapping_df)
+
+pdf(file="mlr-model.pdf")
+# Plot coefficients by class
+p1 <- ggplot(coef_long_renamed, aes(x = Coefficient, y = reorder(Predictor, abs(Coefficient)), 
+                           color = Class)) +
+  geom_point(size = 2) +
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
+  facet_wrap(~Class, scales = "free_x") +
+  labs(title = "Multinomial Coefficients by Class",
+       x = "Coefficient Value",
+       y = "Predictors") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.y = element_text(size = 6))
+print(p1)
+dev.off()
+
+# Heatmap of coefficients
+coef_matrix_plot <- coef_long %>%
+  mutate(Predictor = factor(Predictor, levels = unique(Predictor)))
+
+p2 <- ggplot(coef_matrix_plot, aes(x = Class, y = Predictor, fill = Coefficient)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  labs(title = "Coefficient Heatmap",
+       subtitle = "Blue = negative, Red = positive coefficients") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p2)
+
+# Method 8: Extract coefficients for specific predictors or classes
+# For specific predictor across all classes
+get_predictor_coefs <- function(predictor_name) {
+  if(predictor_name %in% coef_names) {
+    result <- raw_coefficients[, predictor_name, drop = FALSE]
+    cat(paste("Coefficients for", predictor_name, ":\n"))
+    print(result)
+    return(result)
+  } else {
+    cat("Predictor not found. Available predictors:\n")
+    print(coef_names)
+  }
+}
+
+# For specific class across all predictors  
+get_class_coefs <- function(class_name) {
+  if(class_name %in% class_names) {
+    result <- raw_coefficients[class_name, , drop = FALSE]
+    cat(paste("Coefficients for class", class_name, ":\n"))
+    print(result)
+    return(result)
+  } else {
+    cat("Class not found. Available classes:\n")
+    print(class_names)
+  }
+}
+
+# Example usage (uncomment to use):
+# get_predictor_coefs("your_predictor_name")
+# get_class_coefs("your_class_name")
+
+# Method 9: Export coefficients
+# Save to CSV
+write.csv(coef_detailed, "multinomial_coefficients_detailed.csv", row.names = FALSE)
+write.csv(coef_df, "multinomial_coefficients_matrix.csv", row.names = FALSE)
+
+cat("\nCoefficients saved to CSV files:\n")
+cat("- multinomial_coefficients_detailed.csv (long format with statistics)\n")
+cat("- multinomial_coefficients_matrix.csv (matrix format)\n")
+
+# Method 10: Summary interpretation
+cat("\n=== COEFFICIENT INTERPRETATION ===\n")
+cat("For multinomial logistic regression:\n")
+cat("1. Coefficients are log-odds relative to the reference class\n")
+cat("2. Positive coefficient = increases odds of that class vs reference\n")
+cat("3. Negative coefficient = decreases odds of that class vs reference\n")
+cat("4. Magnitude indicates strength of effect\n")
+cat("5. For ordered factors: coefficients show trend across levels\n\n")
+
+# Find largest coefficients
+largest_coefs <- coef_detailed %>%
+  arrange(desc(abs(Coefficient))) %>%
+  head(10)
+
+cat("Top 10 largest coefficients (by absolute value):\n")
+print(largest_coefs[, c("Class", "Predictor", "Coefficient", "P_value", "Significance")])
+
+# Find most significant coefficients
+most_significant <- coef_detailed %>%
+  arrange(P_value) %>%
+  head(10)
+
+cat("\nTop 10 most significant coefficients:\n")
+print(most_significant[, c("Class", "Predictor", "Coefficient", "P_value", "Significance")])
 ```
 
 
@@ -618,65 +1241,213 @@ View(analysis$importance)
 View(analysis$results)
 ```
 
+Alternative approach to evaluate variables importance
 
 ```{r}
-# Install if needed
-# install.packages("ggeffects")
-library(ggeffects)
-
-# Create marginal effects
-age_effect <- ggpredict(model_10f$finalModel, terms = "vek")
-plot(age_effect)
-
-# For multiple variables
-multi_effects <- ggpredict(model_10f$finalModel, terms = c("vek", "some_other_var"))
-plot(multi_effects)
-```
-
-
-```{r}
-library(car)
+# Load required libraries
+library(caret)
 library(ggplot2)
 library(dplyr)
+library(viridis)
+library(gridExtra)
 
-# Get Anova results
-anova_results <- Anova(model_10f$finalModel, type = "II")
+multinom_model <- model_10f
 
-# Create data frame with variable names and importance
-importance_df <- data.frame(
-  FullTerm = rownames(anova_results),
-  Importance = anova_results$`LR Chisq`,
-  P_value = anova_results$`Pr(>Chisq)`
-)
+# Extract variable importance from your caret model
+var_imp <- varImp(multinom_model)
 
-# Clean variable names: remove backticks AND polynomial terms
-importance_df$BaseVariable <- gsub("`", "", importance_df$FullTerm)  # Remove backticks first
-importance_df$BaseVariable <- gsub("\\.L|\\.Q|\\.C|\\^[0-9]+", "", importance_df$BaseVariable)  # Then remove polynomial terms
+# Print the structure to understand what we're working with
+cat("Structure of variable importance object:\n")
+print(str(var_imp))
 
-# Aggregate by base variable (sum the chi-square statistics)
-combined_importance <- importance_df %>%
-  group_by(BaseVariable) %>%
-  summarise(
-    TotalImportance = sum(Importance),
-    MinPValue = min(P_value),
-    NumTerms = n(),  # Number of polynomial terms combined
-    .groups = 'drop'
+# Extract the importance scores
+imp_scores <- var_imp$importance
+cat("\nVariable importance scores:\n")
+print(imp_scores)
+
+# INTERPRETATION:
+# For multinomial logistic regression in caret:
+# - Values represent the absolute value of the t-statistic for each predictor
+# - Higher values = more important for distinguishing between outcome classes
+# - Values are typically scaled to 0-100 (100 = most important variable)
+# - For multiclass outcomes, you get importance for each class comparison
+
+# Method 1: Basic caret plot (built-in visualization)
+cat("\nBasic caret variable importance plot:\n")
+plot(var_imp, main = "Variable Importance from Caret Model")
+
+# Method 2: Enhanced ggplot visualization
+# Prepare data for ggplot
+if(ncol(imp_scores) > 1) {
+  # For multiclass - reshape data for plotting
+  imp_long <- imp_scores %>%
+    tibble::rownames_to_column("Variable") %>%
+    tidyr::gather(key = "Class", value = "Importance", -Variable)
+  
+  # Plot 1: Heatmap for multiclass importance
+  p1 <- ggplot(imp_long, aes(x = Class, y = reorder(Variable, Importance), fill = Importance)) +
+    geom_tile() +
+    scale_fill_viridis_c(name = "Importance") +
+    labs(title = "Variable Importance by Class",
+         subtitle = "Higher values = more important for distinguishing that class",
+         x = "Outcome Class", 
+         y = "Variables") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  # Plot 2: Overall importance (max across classes)
+  imp_overall <- imp_scores %>%
+    tibble::rownames_to_column("Variable") %>%
+    mutate(Max_Importance = apply(select(., -Variable), 1, max),
+           Mean_Importance = apply(select(., -Variable), 1, mean)) %>%
+    arrange(desc(Max_Importance))
+  
+  p2 <- ggplot(imp_overall, aes(x = reorder(Variable, Max_Importance), y = Max_Importance)) +
+    geom_col(fill = "steelblue", alpha = 0.7) +
+    geom_text(aes(label = round(Max_Importance, 1)), 
+              hjust = -0.1, size = 3) +
+    coord_flip() +
+    labs(title = "Overall Variable Importance",
+         subtitle = "Maximum importance across all classes",
+         x = "Variables", 
+         y = "Importance Score") +
+    theme_minimal()
+  
+  # Plot 3: Class-specific importance (faceted)
+  p3 <- ggplot(imp_long, aes(x = reorder(Variable, Importance), y = Importance, fill = Class)) +
+    geom_col() +
+    coord_flip() +
+    facet_wrap(~Class, scales = "free_x") +
+    scale_fill_viridis_d(name = "Class") +
+    labs(title = "Variable Importance by Class (Detailed)",
+         x = "Variables", 
+         y = "Importance Score") +
+    theme_minimal() +
+    theme(legend.position = "bottom")
+  
+} else {
+  # For binary classification or single importance score
+  imp_df <- data.frame(
+    Variable = rownames(imp_scores),
+    Importance = imp_scores[,1]
   ) %>%
-  arrange(desc(TotalImportance))
+    arrange(desc(Importance))
+  
+  p1 <- ggplot(imp_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+    geom_col(fill = "steelblue", alpha = 0.7) +
+    geom_text(aes(label = round(Importance, 1)), 
+              hjust = -0.1, size = 3) +
+    coord_flip() +
+    labs(title = "Variable Importance",
+         subtitle = "Higher values indicate more predictive variables",
+         x = "Variables", 
+         y = "Importance Score") +
+    theme_minimal()
+  
+  p2 <- p1  # Same plot for single class
+  p3 <- p1  # Same plot for single class
+}
 
-# Plot combined importance
-top_n <- 10
-ggplot(combined_importance[1:top_n, ], 
-       aes(x = reorder(BaseVariable, TotalImportance), y = TotalImportance)) +
-  geom_col(fill = "steelblue") +
-  coord_flip() +
-  labs(x = "Variable", y = "Combined LR Chi-square", 
-       title = paste("Top", top_n, "Variables (Combined Polynomial Terms)")) +
-  theme_minimal()
+# Display the plots
+print(p1)
+print(p2)
+if(exists("p3")) print(p3)
 
-# Show the cleaned results
-print(head(combined_importance, 15))
+# Method 3: Interactive plot using plotly (if available)
+if(requireNamespace("plotly", quietly = TRUE)) {
+  library(plotly)
+  
+  if(exists("imp_overall")) {
+    p_interactive <- plot_ly(imp_overall, 
+                           x = ~Max_Importance, 
+                           y = ~reorder(Variable, Max_Importance),
+                           type = 'bar',
+                           orientation = 'h',
+                           text = ~paste("Variable:", Variable, 
+                                       "<br>Max Importance:", round(Max_Importance, 2),
+                                       "<br>Mean Importance:", round(Mean_Importance, 2)),
+                           textposition = 'none',
+                           hovertemplate = "%{text}<extra></extra>") %>%
+      layout(title = "Interactive Variable Importance",
+             xaxis = list(title = "Importance Score"),
+             yaxis = list(title = "Variables"))
+    
+    print(p_interactive)
+  }
+}
 
+# Method 4: Comparison with other importance measures
+cat("\n=== INTERPRETING THE NUMBERS ===\n")
+cat("For multinomial logistic regression in caret:\n")
+cat("1. Scores typically range from 0-100 (scaled)\n")
+cat("2. 100 = most important variable in the model\n")
+cat("3. Values represent |t-statistic| for each coefficient\n")
+cat("4. Higher values = better at distinguishing between classes\n")
+cat("5. For ordered factors: importance shows discriminatory power\n\n")
+
+# Create interpretation table
+if(exists("imp_overall")) {
+  interpretation <- imp_overall %>%
+    mutate(
+      Interpretation = case_when(
+        Max_Importance >= 80 ~ "Very High - Strong predictor",
+        Max_Importance >= 60 ~ "High - Important predictor", 
+        Max_Importance >= 40 ~ "Moderate - Useful predictor",
+        Max_Importance >= 20 ~ "Low - Weak predictor",
+        TRUE ~ "Very Low - Minimal impact"
+      )
+    ) %>%
+    select(Variable, Max_Importance, Interpretation)
+  
+  cat("Variable Importance Interpretation:\n")
+  print(interpretation)
+} else if(exists("imp_df")) {
+  interpretation <- imp_df %>%
+    mutate(
+      Interpretation = case_when(
+        Importance >= 80 ~ "Very High - Strong predictor",
+        Importance >= 60 ~ "High - Important predictor", 
+        Importance >= 40 ~ "Moderate - Useful predictor",
+        Importance >= 20 ~ "Low - Weak predictor",
+        TRUE ~ "Very Low - Minimal impact"
+      )
+    )
+  
+  cat("Variable Importance Interpretation:\n")
+  print(interpretation)
+}
+
+# Method 5: Compare with permutation importance from earlier
+if(exists("perm_importance")) {
+  comparison_df <- data.frame(
+    Variable = names(perm_importance),
+    Caret_Importance = if(exists("imp_overall")) imp_overall$Max_Importance[match(names(perm_importance), imp_overall$Variable)] else imp_df$Importance[match(names(perm_importance), imp_df$Variable)],
+    Permutation_Importance = perm_importance * 100  # Scale to match caret
+  )
+  
+  p_comparison <- ggplot(comparison_df, aes(x = Caret_Importance, y = Permutation_Importance)) +
+    geom_point(size = 3, alpha = 0.7) +
+    geom_smooth(method = "lm", se = TRUE, color = "red") +
+    geom_text(aes(label = Variable), nudge_y = 2, size = 3) +
+    labs(title = "Caret vs Permutation Importance",
+         subtitle = "Agreement between methods indicates robust importance",
+         x = "Caret Variable Importance",
+         y = "Permutation Importance (scaled)") +
+    theme_minimal()
+  
+  print(p_comparison)
+  
+  # Calculate correlation
+  cor_imp <- cor(comparison_df$Caret_Importance, comparison_df$Permutation_Importance, use = "complete.obs")
+  cat(paste("\nCorrelation between caret and permutation importance:", round(cor_imp, 3), "\n"))
+}
+
+cat("\n=== RECOMMENDATIONS FOR ORDERED FACTORS ===\n")
+cat("1. Focus on variables with importance > 40 for practical significance\n")
+cat("2. For ordered factors, high importance suggests strong trend across levels\n")
+cat("3. Consider the class-specific importance for understanding which outcomes are best predicted\n")
+cat("4. Cross-validate importance with other methods (LR tests, stepwise selection)\n")
+cat("5. Variables important across multiple methods are most reliable\n")
 ```
 
 The mosaic plots of potentially significant variables directly from data
@@ -1046,12 +1817,6 @@ for (level in dep.var.levels){
 }
 print(strong.vars)
 ```
-
-```{r}
-
-```
-
-
 
 ```{r}
 library(dplyr)
