@@ -1458,9 +1458,14 @@ old_par <- par(no.readonly = TRUE)
 # Adjust margins (bottom, left, top, right)
 par(mar = c(2, 2, 4, 2))  # Increase top margin
 
-var.names <- c("vek", "pomer_zakladni", "obor_tlak", "obor_dotovany", "kar_citace", "spec_hlavni", "kar_titul", "obor_medializ", "obor_rychly")
+var.names <- c("vek", "pomer_zakladni", "obor_tlak", "obor_dotovany", "kar_citace",
+               "spec_hlavni", "kar_titul", "obor_medializ", "obor_rychly",
+               "nerep_narust", "nerep_problem", "nerep_chyba", "nerep_veda",
+               "nerep_valid", "nerep_neobj")
 eng.var.names <- c("Age group", "Proportion of Basic Research", "Extraordinary Pressure to Achieve Results",
-                   "Heavily Subsidized Field", "Number of Citations", "Research Field", "Professional Degree", "Highly visible field","Rapidly Changing Field")
+                   "Heavily Subsidized Field", "Number of Citations", "Research Field", "Professional Degree", "Highly visible field","Rapidly Changing Field",
+                   "Increasing Research Irreproducibility", "My Discipline-Specific Reproducibility Crisis", "Non-Replicable Results as Error Indicators",
+                   "Irreproducible Results as Scientific Process", "Irreproducibility Rarely Invalidates Original Findings", "Irreproducibility Undermining Scientific Objectivity")
 for (i in 1:length(var.names)){
   var.name <- var.names[i]
   eng.var.name <- eng.var.names[i]
@@ -1487,7 +1492,11 @@ for (i in 1:length(var.names)){
     if (var.name=="kar_citace"){
       rownames(my.tab) <- c("Up to 100", "Up to 500", "Up to 1000", "Up to 5000", "More than 5000")
     }
-
+    if (is.element(var.name,c("nerep_narust", "nerep_problem", "nerep_chyba", "nerep_veda",
+               "nerep_valid", "nerep_neobj"))){
+      rownames(my.tab) <- c("Neutral", "Don't know", "Strongly disagree", "Strongly agree", "Somewhat disagree", "Somewhat agree")
+      my.tab <- my.tab[c(3,5,2,1,6,4),]
+    }
     mosaicplot(my.tab,col = c(4,6,7,8),main="", dir=c("h","v"), las=2, 
              xlab="Is there a replication crisis?", ylab=eng.var.name)
   dev.off()
