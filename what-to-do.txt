@@ -1,5 +1,32 @@
-cluster analysis
-obor exaktnost vs. obor mosaic plot
-PCA pro obor_
-PCA pro kariera_
-korelace nerep_ s krize_rep
+1) cluster analysis
+
+2) obor exaktnost vs. obor mosaic plot
+obor_ekzaktnost
+spec_hlavni
+
+3) PCA pro obor_
+obor_dotovany
+obor_konkuren
+obor_tlak
+obor_rychly
+obor_priliv
+obor_publikac
+obor_medializ
+obor_verejnos
+obor_komplexn
+obor_mensi
+obor_ekzaktnost
+
+4) PCA pro kariera_
+kar_praxe
+kar_titul
+kar_citace
+kar_nejlepsi
+X kar_kategorie
+X kar_komentar
+
+5) korelace nerep_ s krize_rep
+nerep_jaMuj
+nerep_jaCizi
+nerep_oniMuj
+
