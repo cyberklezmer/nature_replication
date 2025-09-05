@@ -1,0 +1,5 @@
+cluster analysis
+obor exaktnost vs. obor mosaic plot
+PCA pro obor_
+PCA pro kariera_
+korelace nerep_ s krize_rep

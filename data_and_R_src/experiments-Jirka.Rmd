@@ -268,7 +268,8 @@ Correlation analysis
 library(psych)
 
 # Prepare the data
-my.vars.prepared <- my.vars
+my.vars.prepared <- my_clean
+# my.vars.prepared <- my.vars
 
 # Convert ordered factors to numeric (these are ordinal)
 ordered_vars <- sapply(my.vars.prepared, is.ordered)
