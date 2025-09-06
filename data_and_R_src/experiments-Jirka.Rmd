@@ -536,7 +536,7 @@ my.vars.bn.clean <- my.vars.bn.discrete[, good_vars]
 my.vars.bn.clean <- na.omit(my.vars.bn.clean)
 
 # Now we can learn the Bayesian network structure
-bn_structure <- hc(my.vars.bn.clean, score = "aic")
+bn_structure <- bnlearn::hc(my.vars.bn.clean, score = "aic")
 # Number of edges for different scoring functions
 #   BIC (default): 28 edges
 #   AIC: 40 edges
@@ -695,7 +695,7 @@ missing_pct <- my %>%
   dplyr::select(all_of(valid.predictors)) %>%
   summarise_all(~mean(is.na(.)) * 100)
 # Keep only variables with <10% missing
-good_vars <- names(missing_pct)[missing_pct < 10]
+good_vars <- names(missing_pct)[missing_pct < 25]
 # These are variables that are frequently missing
 print(setdiff(all.predictors,good_vars))
 ```
@@ -819,8 +819,14 @@ Plotting the influence of explanatory variables as represented in the learned mo
 
 ```{r}
 library(effects)
+
 # Create effect plot for variable "vek"
 age_effect <- Effect("vek", model)
+plot(age_effect, style = "stacked")  # or "lines" for separate lines
+
+
+# Create effect plot for variable "kar_praxe"
+age_effect <- Effect("kar_praxe", model)
 plot(age_effect, style = "stacked")  # or "lines" for separate lines
 
 # Create effect plot for variable "pomer_zakladni"
@@ -865,6 +871,17 @@ actual_outcomes <- training_data$.outcome[complete_rows]
 cm <- confusionMatrix(final_predictions, actual_outcomes)
 print(cm)
 print.cfM(cm$table, file="cfM-mlr-10f.pdf")
+```
+```{r}
+source("../../CBSllm/CV-functions-v18.R")
+
+# Run cross-validation
+results <- greedy_forward_selection(
+  data = my[,c(good_vars,dependent.var)],
+  response_var = dependent.var,
+  decay_val = c(0.01, 0.1, 1, 2, 5, 10, 20),
+)
+
 ```
 
 Compute correlations between predictions and actual outcomes
@@ -1679,17 +1696,105 @@ print(grouped_importance)
 
 ```
 
-Latent Class Analysis
+Cluster analysis
+
+```{r}
+library(mclust)
+
+# Remove variables with excessive missing values (e.g., >20% missing)
+threshold <- 0.1
+my.vars.clean <- my.vars.for_cor[, sapply(my.vars.for_cor, function(x) mean(is.na(x))) < threshold]
+
+# Then remove remaining incomplete cases
+complete_data <- na.omit(my.vars.clean)
+# nrow(complete_data)
+
+mod1 <- Mclust(complete_data)
+summary(mod1)
+plot(mod1,  what = "BIC")
+```
+
+```{r}
+# 1. Basic cluster summary
+summary(mod1)
+
+# 2. Cluster means comparison
+cluster_means <- mod1$parameters$mean
+print(cluster_means)
+
+# 3. Cluster sizes
+cluster_sizes <- table(mod1$classification)
+print(cluster_sizes)
+
+# 4. Create detailed comparison
+library(dplyr)
+# Add cluster assignments to your original data
+clustered_data <- cbind(complete_data, cluster = mod1$classification)
+
+# Calculate descriptive statistics by cluster
+cluster_summary <- clustered_data %>%
+  group_by(cluster) %>%
+  summarise_all(list(mean = ~mean(., na.rm=TRUE), 
+                    sd = ~sd(., na.rm=TRUE)))
+
+# 5. Visualize differences
+plot(mod1, what = "classification")
+```
+
+Looking at the cluster means, here's what characterizes each group:
+
+## Cluster Descriptions:
+
+### **Cluster 1 (n=284): "High-Profile Academic Cluster"**
+This cluster is characterized by **higher values** in:
+- **obor_medializ** (4.20 vs 1.84) - Much more media attention
+- **obor_publikac** (4.14 vs 3.39) - More publication-oriented
+- **obor_dotovany** (3.05 vs 2.24) - Better funded fields
+- **obor_konkuren** (4.11 vs 3.44) - More competitive fields
+- **obor_priliv** (3.01 vs 2.14) - More attractive/popular fields
+- **obor_rychly** (3.44 vs 2.88) - Faster-moving fields
+- **obor_komplexn** (4.26 vs 3.87) - More complex fields
+- **kar_praxe** (3.03 vs 2.90) - Slightly more practical experience
+- **kar_citace** (2.44 vs 2.28) - Slightly more citations
+
+### **Cluster 2 (n=446): "Lower-Profile Academic Cluster"** 
+This cluster is characterized by **higher values** in:
+- **krize_rep** (2.30 vs 1.95) - More reputation crises/challenges
+- **obor_mensi** (2.81 vs 2.33) - Smaller fields
+- **pomer_zakladni** (8.05 vs 7.90) - Slightly higher basic proportion
+- **kar_nejlepsi** (1.74 vs 1.68) - Slightly better career outcomes
+- **cinnost_exper** (1.75 vs 1.63) - More experimental activities
+
+## Key Insights:
+
+1. **Cluster 1** represents academics in **high-visibility, well-funded, competitive fields** with more media attention and publication focus.
+
+2. **Cluster 2** represents academics in **smaller, less visible fields** that may face more reputational challenges but have slightly better individual outcomes.
+
+3. **Gender** is nearly identical across clusters (1.69 vs 1.67), suggesting this clustering isn't gender-driven.
+
+The biggest discriminating factors are **media attention (obor_medializ)**, **funding (obor_dotovany)**, and **field attractiveness (obor_priliv)** - essentially separating "high-profile" from "low-profile" academic fields.
+
+**************************************************************************************************************
+
+Latent Class Analysis (more suitable than cluster analysis for nominal data in spec_hlavni)
 
 ```{r}
 library(poLCA)
-f <- create_polca_formula(my.vars.for_cor)
+
+# if we want to consider also this variable with 10 values
+my.vars.bn <- cbind(my.vars.for_cor, my.vars$spec_hlavni)
+colnames(my.vars.bn) <- c(colnames(my.vars.bn)[-length(colnames(my.vars.bn))],"spec_hlavni")
+# Convert all columns to factors at once
+my.vars.bn.discrete <- as.data.frame(lapply(my.vars.bn, as.factor))
+
+f <- create_polca_formula(my.vars.bn)
 min_bic <- Inf
 bic.values <- rep(0,8-2+1)
 for(i in 2:8){
-  lc <- poLCA(f, data = my.vars.for_cor, nclass=i, maxiter=3000, 
+  lc <- poLCA(f, data = my.vars.bn.discrete, nclass=i, maxiter=3000, 
               tol=1e-5, na.rm=FALSE,  
-              nrep=10, verbose=TRUE, calc.se=TRUE)
+              nrep=10, verbose=FALSE, calc.se=TRUE)
   bic.values[i-1] <- lc$bic 
   if(lc$bic < min_bic){
     min_bic <- lc$bic
@@ -1708,11 +1813,323 @@ pdf(file="LCA-BIC-values.pdf", width=5,height=4)
   plot(x=2:8,y=-bic.values, xlab="number of latent classes", ylab="BIC value",type="l", lwd=2)
   grid()
 dev.off()
-
-
-
 ```
-Claude's comment to the output:
+
+```{r}
+# Calculate actual values from your poLCA results for bubble plot
+# Assuming your poLCA model is stored as 'mod1' or similar
+
+# 1. EXPERIMENTAL INTENSITY (cinnost_exper) - weighted average for each class
+# From your output: cinnost_exper has levels 1,2,3,4
+experimental_intensity <- c(
+  # Class 1: 0.6680*1 + 0.1808*2 + 0.1210*3 + 0.0302*4
+  0.6680*1 + 0.1808*2 + 0.1210*3 + 0.0302*4,
+  
+  # Class 2: 0.5374*1 + 0.2241*2 + 0.1109*3 + 0.1276*4  
+  0.5374*1 + 0.2241*2 + 0.1109*3 + 0.1276*4,
+  
+  # Class 3: 0.4448*1 + 0.1894*2 + 0.1275*3 + 0.2383*4
+  0.4448*1 + 0.1894*2 + 0.1275*3 + 0.2383*4
+)
+
+print("Experimental Intensity by Class:")
+print(paste("Class 1:", round(experimental_intensity[1], 2)))
+print(paste("Class 2:", round(experimental_intensity[2], 2)))
+print(paste("Class 3:", round(experimental_intensity[3], 2)))
+
+# 2. CRISIS PERCEPTION (krize_rep) - weighted average for each class
+# From your output: krize_rep has levels 1,2,3,4
+crisis_perception <- c(
+  # Class 1: 0.5111*1 + 0.2997*2 + 0.1181*3 + 0.0711*4
+  0.5111*1 + 0.2997*2 + 0.1181*3 + 0.0711*4,
+  
+  # Class 2: 0.2932*1 + 0.2530*2 + 0.3686*3 + 0.0851*4
+  0.2932*1 + 0.2530*2 + 0.3686*3 + 0.0851*4,
+  
+  # Class 3: 0.2169*1 + 0.2925*2 + 0.2675*3 + 0.2231*4
+  0.2169*1 + 0.2925*2 + 0.2675*3 + 0.2231*4
+)
+
+print("\nCrisis Perception by Class:")
+print(paste("Class 1:", round(crisis_perception[1], 2)))
+print(paste("Class 2:", round(crisis_perception[2], 2)))
+print(paste("Class 3:", round(crisis_perception[3], 2)))
+
+# 3. CLASS SIZES (from estimated class population shares)
+class_sizes <- c(0.2669, 0.473, 0.2601)  # From your output
+total_n <- 878  # Total observations
+
+actual_class_sizes <- class_sizes * total_n
+
+print("\nClass Sizes:")
+print(paste("Class 1:", round(actual_class_sizes[1])))
+print(paste("Class 2:", round(actual_class_sizes[2])))
+print(paste("Class 3:", round(actual_class_sizes[3])))
+
+# 4. FIELD DISTRIBUTIONS by class (from spec_hlavni)
+# Create field groupings for cleaner visualization
+biology_prop <- c(0.5336, 0.3678, 0.2417)  # Biology proportion in each class
+physics_earth_prop <- c(
+  0.0082 + 0.0393 + 0.0952,  # Class 1: Astronomy + Earth + Physics
+  0.0050 + 0.1413 + 0.1230,  # Class 2: Astronomy + Earth + Physics  
+  0.0175 + 0.1274 + 0.2042   # Class 3: Astronomy + Earth + Physics
+)
+chem_materials_prop <- c(0.1819 + 0.0293, 0.1254 + 0.0979, 0.1238 + 0.0722)
+
+# Create comprehensive data frame for bubble plot
+bubble_data_calculated <- data.frame(
+  Class = c("Class 1: Elite Math", "Class 2: Early Career", "Class 3: Senior Exp"),
+  Crisis_Perception = crisis_perception,
+  Experimental_Intensity = experimental_intensity,
+  Class_Size = actual_class_sizes,
+  Biology_Prop = biology_prop,
+  Physics_Earth_Prop = physics_earth_prop,
+  Chem_Materials_Prop = chem_materials_prop
+)
+
+print("\nFinal Data for Bubble Plot:")
+print(bubble_data_calculated)
+
+# 5. Create the actual bubble plot with calculated values
+library(ggplot2)
+
+# Simple version with one bubble per class
+p1 <- ggplot(bubble_data_calculated, aes(x = Experimental_Intensity, 
+                                        y = Crisis_Perception,
+                                        size = Class_Size)) +
+  geom_point(alpha = 0.7, color = "steelblue") +
+  geom_text(aes(label = gsub("Class [0-9]: ", "", Class)), 
+            vjust = -1.5, size = 3.5, show.legend = FALSE) +
+  
+  scale_size_continuous(name = "Class Size", range = c(5, 20)) +
+  
+  labs(title = "Reproducibility Crisis Perception vs Experimental Intensity",
+       subtitle = "Each bubble represents one latent class of academics",
+       x = "Experimental Intensity (1=low, 4=high)",
+       y = "Reproducibility Crisis Concern (1=no crisis, 4=severe crisis)",
+       caption = "Bubble size = number of academics in class") +
+  
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14, face = "bold"),
+        plot.subtitle = element_text(size = 11)) +
+  
+  # Add correlation line
+  geom_smooth(method = "lm", se = FALSE, color = "red", linetype = "dashed", size = 0.8) +
+  
+  # Expand axes slightly for better label visibility  
+  expand_limits(x = c(1, 2.5), y = c(1.5, 2.8))
+
+pdf(file="LCA Reproducibility Crisis Perception vs Experimental Intensity.pdf")
+  print(p1)
+dev.off()
+
+# 6. Enhanced version showing field composition
+# Reshape data to show field breakdowns
+library(tidyr)
+library(dplyr)
+
+# Check column names first
+print("Column names in bubble_data_calculated:")
+print(names(bubble_data_calculated))
+
+# Alternative approach - create field data manually to avoid select issues
+field_data <- data.frame(
+  Class = rep(c("Class 1: Elite Math", "Class 2: Early Career", "Class 3: Senior Exp"), each = 3),
+  Crisis_Perception = rep(crisis_perception, each = 3),
+  Experimental_Intensity = rep(experimental_intensity, each = 3),
+  Class_Size = rep(actual_class_sizes, each = 3),
+  Field = rep(c("Biology", "Physics/Earth", "Chemistry/Materials"), 3),
+  Proportion = c(
+    biology_prop[1], physics_earth_prop[1], chem_materials_prop[1],  # Class 1
+    biology_prop[2], physics_earth_prop[2], chem_materials_prop[2],  # Class 2  
+    biology_prop[3], physics_earth_prop[3], chem_materials_prop[3]   # Class 3
+  )
+) %>%
+  mutate(Field_Size = Class_Size * Proportion) %>%
+  filter(Proportion > 0.05)  # Only show substantial field representations
+
+# BETTER OPTION 1: Side-by-side stacked bar charts
+crisis_field_data <- data.frame(
+  Class = rep(c("Class 1:\nElite Math", "Class 2:\nEarly Career", "Class 3:\nSenior Exp"), each = 4),
+  Crisis_Level = rep(c("No Crisis", "Low Crisis", "Moderate Crisis", "High Crisis"), 3),
+  Probability = c(
+    # Class 1 probabilities (from krize_rep output)
+    0.51, 0.30, 0.12, 0.07,
+    # Class 2 probabilities  
+    0.29, 0.25, 0.37, 0.09,
+    # Class 3 probabilities
+    0.22, 0.29, 0.27, 0.22
+  ),
+  # Add experimental intensity for positioning
+  Experimental_Intensity = rep(experimental_intensity, each = 4)
+) %>%
+  mutate(Crisis_Level = factor(Crisis_Level, 
+                              levels = c("No Crisis", "Low Crisis", "Moderate Crisis", "High Crisis")))
+
+p2_stacked <- ggplot(crisis_field_data, aes(x = reorder(Class, Experimental_Intensity), 
+                                           y = Probability, 
+                                           fill = Crisis_Level)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  scale_fill_manual(name = "Crisis Perception",
+                    values = c("No Crisis" = "#2E8B57",
+                              "Low Crisis" = "#90EE90", 
+                              "Moderate Crisis" = "#FFD700",
+                              "High Crisis" = "#DC143C")) +
+  labs(title = "Reproducibility Crisis Perceptions by Academic Class",
+       subtitle = "Classes ordered by experimental intensity (left=least, right=most experimental)",
+       x = "Academic Class",
+       y = "Proportion",
+       caption = "Clear trend: More experimental → More crisis concern") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14, face = "bold"),
+        axis.text.x = element_text(size = 10),
+        legend.position = "bottom")
+
+pdf(file = "LCA Reproducibility Crisis Perceptions by Academic Class.pdf")
+  print(p2_stacked)
+dev.off()
+
+# BETTER OPTION 2: Faceted field composition plot  
+field_summary <- data.frame(
+  Class = rep(c("Elite Math", "Early Career", "Senior Exp"), 3),
+  Field = rep(c("Biology", "Physics/Earth", "Chemistry/Materials"), each = 3),
+  Proportion = c(biology_prop, physics_earth_prop, chem_materials_prop),
+  Crisis_Perception = rep(crisis_perception, 3),
+  Experimental_Intensity = rep(experimental_intensity, 3)
+) %>%
+  filter(Proportion > 0.1)  # Only show fields with >10% representation
+
+p3_faceted <- ggplot(field_summary, aes(x = Experimental_Intensity, 
+                                       y = Crisis_Perception,
+                                       size = Proportion)) +
+  geom_point(alpha = 0.8, color = "steelblue") +
+  
+  # Use repel to avoid overlapping and keep labels inside plot
+  ggrepel::geom_text_repel(aes(label = Class), 
+                          size = 2.8, 
+                          show.legend = FALSE,
+                          max.overlaps = 20,
+                          box.padding = 0.3,
+                          point.padding = 0.2) +
+  
+  facet_wrap(~ Field, scales = "free") +
+  
+  scale_size_continuous(name = "Field Proportion\nwithin Class", 
+                       range = c(4, 12), 
+                       labels = scales::percent) +
+  
+  labs(title = "Crisis Perception vs Experimental Intensity by Field",
+       subtitle = "Each panel shows one field; bubble size = proportion of class in that field",
+       x = "Experimental Intensity",
+       y = "Crisis Perception") +
+  
+  theme_minimal() +
+  theme(plot.title = element_text(size = 13, face = "bold"),
+        strip.text = element_text(size = 11, face = "bold"),
+        panel.spacing = unit(1, "lines")) +
+  
+  # Expand plot margins to accommodate labels
+  coord_cartesian(clip = "off")
+
+pdf(file="LCA Crisis Perception vs Experimental Intensity by Field.pdf")
+  print(p3_faceted)
+dev.off()
+
+# BEST OPTION 3: Clean correlation plot with annotations
+correlation_data <- data.frame(
+  Class = c("Elite Math", "Early Career", "Senior Exp"),
+  Crisis_Perception = crisis_perception,
+  Experimental_Intensity = experimental_intensity,
+  Class_Size = actual_class_sizes,
+  Top_Field = c("Biology (53%)", "Biology (37%)", "Physics (20%)")
+)
+
+p4_clean <- ggplot(correlation_data, aes(x = Experimental_Intensity, 
+                                        y = Crisis_Perception,
+                                        size = Class_Size)) +
+  geom_point(alpha = 0.7, color = "steelblue") +
+  
+  # Add class labels and top field info
+  geom_text(aes(label = paste0(Class, "\n", Top_Field)), 
+            vjust = -1.8, hjust = 0.5, size = 3.5, 
+            lineheight = 0.8, show.legend = FALSE) +
+  
+  # Correlation line (inherit.aes = FALSE to avoid size aesthetic warning)
+  geom_smooth(aes(x = Experimental_Intensity, y = Crisis_Perception), 
+              method = "lm", se = TRUE, color = "red", 
+              linetype = "dashed", alpha = 0.3, inherit.aes = FALSE) +
+  
+  scale_size_continuous(name = "Class Size", range = c(8, 20)) +
+  
+  labs(title = "The Reproducibility Paradox",
+       subtitle = "More experimental academics are more concerned about reproducibility crisis",
+       x = "Experimental Intensity →",
+       y = "Crisis Concern →",
+       caption = "Bubble size = number of academics; Top field shown for each class\nCorrelation confirms: experimental experience drives crisis awareness") +
+  
+  theme_minimal() +
+  theme(plot.title = element_text(size = 16, face = "bold"),
+        plot.subtitle = element_text(size = 12),
+        plot.caption = element_text(size = 10, color = "gray60"),
+        axis.title = element_text(size = 11)) +
+  
+  # Expand limits for better label visibility
+  expand_limits(x = c(1.3, 2.4), y = c(1.6, 2.8))
+
+pdf(file="LCA Experimental academics are more concerned about reproducibility crisis.pdf")
+  print(p4_clean)
+dev.off()
+```
+
+Claude's comment to the output
+**krize_rep** measures academics' **perceptions of the reproducibility crisis**, not personal reputation issues. 
+
+## **Reproducibility Crisis Perceptions by Class:**
+
+### **Class 1 (Elite Math Academics): LEAST concerned about reproducibility crisis**
+- **51% see NO/minimal crisis** (level 1) - most optimistic
+- Only 19% see moderate-severe crisis (levels 3-4)
+
+### **Class 2 (Early Career Mainstream): MODERATE concern**  
+- **29% see no crisis** - more aware than elites
+- **45% see moderate-severe crisis** (levels 3-4)
+
+### **Class 3 (Senior Experimentalists): MOST concerned about reproducibility crisis**
+- **Only 22% dismiss the crisis** - most pessimistic group
+- **49% see moderate-severe crisis** (levels 3-4)
+- **22% see severe crisis** (level 4) - twice other classes!
+
+## **Field-Specific Reproducibility Concerns:**
+
+### **HIGH-CONCERN Fields:**
+- **Physics** (Class 3: 20%) - complex experiments, instrumentation issues
+- **Earth/Environmental Science** (Classes 2&3: ~13-14%) - modeling challenges, data complexity
+
+### **LOW-CONCERN Fields:**
+- **Biology** (Class 1: 53%) - despite known reproducibility issues, these academics are less worried
+- **Mathematics** - theoretical work less affected by reproducibility problems
+
+## **Key Insights:**
+
+1. **"Experience Effect"**: Senior experimentalists (Class 3) have **seen the problems firsthand** - they know how hard reproducibility is
+
+2. **"Mathematical Blind Spot"**: Elite mathematical academics (Class 1) may be **insulated** from reproducibility issues in their theoretical work
+
+3. **"Experimental Reality"**: Classes doing more experimental work (especially Class 3) are **acutely aware** of reproducibility challenges
+
+4. **"Field Sensitivity"**: Physics and Earth Sciences practitioners are more concerned - fields with complex experiments and models
+
+## **Practical Implications:**
+
+- **Experimental scientists** are more realistic about reproducibility challenges
+- **Theoretical/mathematical** researchers may underestimate the scope of the crisis
+- **Senior academics** with experimental experience are most **alarmed** - they've witnessed the problems evolve
+- **Early career** researchers have moderate awareness but less direct experience
+
+This suggests reproducibility crisis awareness follows **direct exposure** - those doing the experiments know the problems best, while theoretical researchers may not fully grasp the extent of the issue.
+
+*****************************************************************************************************************************
+Claude's comment to the output without spec_hlavni:
 Looking at this poLCA output, here's my interpretation of the 3-class model:
 
 ## Class Characteristics
@@ -1764,4 +2181,278 @@ Looking at this poLCA output, here's my interpretation of the 3-class model:
 **This suggests that career stage and institutional position influence perception of representation crises.** The middle-career group may be most sensitive to these issues, possibly because they're actively navigating career advancement and facing these pressures directly.
 
 The model fit statistics suggest this is a reasonable solution, though the large sample size makes goodness-of-fit tests less reliable. The clear differentiation in krize_rep across classes indicates this latent class structure captures meaningful variation in your key outcome variable.
+************************************************************************************************************************************
 
+PCA for "obor_"
+
+```{r}
+
+PCA.vars <- c("obor_dotovany",
+"obor_konkuren",
+"obor_tlak",
+"obor_rychly",
+"obor_priliv",
+"obor_publikac",
+"obor_medializ",
+"obor_verejnos",
+"obor_komplexn",
+"obor_mensi",
+"obor_ekzaktnost"
+)
+
+library(missMDA)
+library(FactoMineR)
+
+# This is often the most robust approach
+# Step 1: Estimate optimal number of components
+nb_components <- estim_ncpPCA(my.vars.for_cor[,PCA.vars], 
+                              method.cv = "Kfold", verbose = FALSE)
+
+# Step 2: Impute missing values using PCA
+imputed_result <- imputePCA(my.vars.for_cor[,PCA.vars], 
+                           ncp = nb_components$ncp)
+
+# Step 3: Run final PCA
+pca_result <- PCA(imputed_result$completeObs, 
+                 scale.unit = TRUE, 
+                 graph = FALSE)
+
+# Access results
+# pca_result$ind$coord    # Individual coordinates (scores)
+pca_result$var$coord    # Variable coordinates (loadings)
+pca_result$eig          # Eigenvalues and explained variance
+
+# pca_result <- prcomp(my.vars.for_cor[,PCA.vars], scale. = TRUE)
+
+
+```
+
+PCA plots
+
+```{r}
+# Assuming the PCA result is stored in 'pca_result'
+
+library(ggplot2)
+library(ggrepel)
+
+# Convert to data frame
+loadings_df <- data.frame(
+  Variable = rownames(pca_result$var$coord),
+  PC1 = pca_result$var$coord[,1],
+  PC2 = pca_result$var$coord[,2]
+)
+
+# Plot loadings for first two components
+pdf(file="fields-PC1-PC2.pdf")
+  ggplot(loadings_df, aes(x = PC1, y = PC2)) +
+    geom_point(color = "blue", size = 3) +
+    geom_text_repel(aes(label = Variable), 
+                    size = 3,
+                    box.padding = 0.5,      # Space around labels
+                    point.padding = 0.3,    # Space from points
+                    max.overlaps = Inf) +   # Allow all labels
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray") +
+    labs(x = paste0("PC1 (", round(pca_result$eig[1,2], 1), "%)"),
+         y = paste0("PC2 (", round(pca_result$eig[2,2], 1), "%)"),
+         title = "PCA - Variables Loadings") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5))
+dev.off()
+```
+```{r}
+
+library(ggplot2)
+library(gridExtra)
+
+# Extract eigenvalues and variance
+eigenvals <- pca_result$eig[,1]
+var_explained <- pca_result$eig[,2]
+cum_var <- pca_result$eig[,3]
+
+pdf(file="fields-scree-cum-plots.pdf", width = 14, height = 7)
+  # Scree plot
+  scree_plot <- ggplot(data.frame(PC = 1:length(eigenvals), Eigenvalue = eigenvals), 
+                       aes(x = PC, y = Eigenvalue)) +
+    geom_line(color = "blue", size = 1) +
+    geom_point(color = "blue", size = 3) +
+    geom_hline(yintercept = 1, linetype = "dashed", color = "red") +
+    labs(title = "Scree Plot", x = "Principal Component", y = "Eigenvalue") +
+    theme_minimal()
+  
+  # Cumulative variance plot  
+  cum_plot <- ggplot(data.frame(PC = 1:length(cum_var), CumVar = cum_var), 
+                     aes(x = PC, y = CumVar)) +
+    geom_line(color = "green", size = 1) +
+    geom_point(color = "green", size = 3) +
+    geom_hline(yintercept = 80, linetype = "dashed", color = "red") +
+    labs(title = "Cumulative Variance", x = "Principal Component", y = "Cumulative % Variance") +
+    theme_minimal()
+  
+  grid.arrange(scree_plot, cum_plot, ncol = 2)
+dev.off()
+```
+## Key Interpretations from PCA results:
+
+**1. Kaiser Criterion (Eigenvalue > 1.0):**
+- Components 1, 2, and 3 have eigenvalues > 1.0
+- **Suggests 3 components** as optimal
+
+**2. Scree Plot Analysis:**
+- Large drop from PC1 (3.48) to PC2 (1.09) - major "elbow"
+- Gradual decline afterward with a smaller elbow around PC3-PC4
+- **Suggests 2-3 components**
+
+**3. Variance Explained:**
+- PC1 alone explains 31.6% of variance (dominant component)
+- First 3 components explain 50.6% of total variance
+- First 7 components needed for 80% variance threshold
+
+## **My Recommendation:**
+
+Based on your data, I'd suggest **3 components** as optimal because:
+- Meets Kaiser criterion (eigenvalue > 1.0)
+- Captures over 50% of total variance
+- Shows clear elbow in scree plot after PC3
+- Maintains good interpretability
+
+
+```{r}
+library(factoextra)
+
+# Circle of correlations
+fviz_pca_var(pca_result, 
+             axes = c(1,2),            # Which PCs to plot
+             col.var = "black",
+             alpha.var = 0.7,
+             repel = TRUE) +
+  theme_minimal() +
+  ggtitle("PCA - Circle of Correlations")
+
+# For different PC pairs
+fviz_pca_var(pca_result, axes = c(1,3))  # PC1 vs PC3
+fviz_pca_var(pca_result, axes = c(2,3))  # PC2 vs PC3
+
+```
+Practical Implications:
+
+PC1 helps you identify which fields are most "active" overall
+PC2 distinguishes between technical fields (mathematics, physics) vs. public fields (journalism, politics)
+PC3 reveals the relationship between field size and competitive pressure
+
+***************************************************************************************************************************
+
+PCA for "kar_"
+
+```{r}
+PCA.vars <- c("kar_praxe",
+"kar_titul",
+"kar_citace",
+"kar_nejlepsi")
+
+library(missMDA)
+library(FactoMineR)
+
+# This is often the most robust approach
+# Step 1: Estimate optimal number of components
+nb_components <- estim_ncpPCA(my.vars.for_cor[,PCA.vars], 
+                              method.cv = "Kfold", verbose = FALSE)
+
+# Step 2: Impute missing values using PCA
+imputed_result <- imputePCA(my.vars.for_cor[,PCA.vars], 
+                           ncp = nb_components$ncp)
+
+# Step 3: Run final PCA
+pca_result <- PCA(imputed_result$completeObs, 
+                 scale.unit = TRUE, 
+                 graph = FALSE)
+
+# Access results
+# pca_result$ind$coord    # Individual coordinates (scores)
+pca_result$var$coord    # Variable coordinates (loadings)
+pca_result$eig          # Eigenvalues and explained variance
+
+# pca_result <- prcomp(my.vars.for_cor[,PCA.vars], scale. = TRUE)
+
+```
+```{r}
+
+library(ggplot2)
+library(ggrepel)
+
+# Convert to data frame
+loadings_df <- data.frame(
+  Variable = rownames(pca_result$var$coord),
+  PC1 = pca_result$var$coord[,1],
+  PC2 = pca_result$var$coord[,2]
+)
+
+# Plot loadings for first two components
+pdf(file="career-PC1-PC2.pdf")
+  ggplot(loadings_df, aes(x = PC1, y = PC2)) +
+    geom_point(color = "blue", size = 3) +
+    geom_text_repel(aes(label = Variable), 
+                    size = 3,
+                    box.padding = 0.5,      # Space around labels
+                    point.padding = 0.3,    # Space from points
+                    max.overlaps = Inf) +   # Allow all labels
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray") +
+    labs(x = paste0("PC1 (", round(pca_result$eig[1,2], 1), "%)"),
+         y = paste0("PC2 (", round(pca_result$eig[2,2], 1), "%)"),
+         title = "PCA - Variables Loadings") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5))
+dev.off()
+
+```
+
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# Extract eigenvalues and variance
+eigenvals <- pca_result$eig[,1]
+var_explained <- pca_result$eig[,2]
+cum_var <- pca_result$eig[,3]
+
+pdf(file="career-scree-cum-plots.pdf", width = 14, height = 7)
+  # Scree plot
+  scree_plot <- ggplot(data.frame(PC = 1:length(eigenvals), Eigenvalue = eigenvals), 
+                       aes(x = PC, y = Eigenvalue)) +
+    geom_line(color = "blue", size = 1) +
+    geom_point(color = "blue", size = 3) +
+    geom_hline(yintercept = 1, linetype = "dashed", color = "red") +
+    labs(title = "Scree Plot", x = "Principal Component", y = "Eigenvalue") +
+    theme_minimal()
+  
+  # Cumulative variance plot  
+  cum_plot <- ggplot(data.frame(PC = 1:length(cum_var), CumVar = cum_var), 
+                     aes(x = PC, y = CumVar)) +
+    geom_line(color = "green", size = 1) +
+    geom_point(color = "green", size = 3) +
+    geom_hline(yintercept = 80, linetype = "dashed", color = "red") +
+    labs(title = "Cumulative Variance", x = "Principal Component", y = "Cumulative % Variance") +
+    theme_minimal()
+  
+  grid.arrange(scree_plot, cum_plot, ncol = 2)
+dev.off()
+```
+```{r}
+library(factoextra)
+
+# Circle of correlations
+fviz_pca_var(pca_result, 
+             axes = c(1,2),            # Which PCs to plot
+             col.var = "black",
+             alpha.var = 0.7,
+             repel = TRUE) +
+  theme_minimal() +
+  ggtitle("PCA - Circle of Correlations")
+
+```
+Key Insight:
+
+Being "nejlepsi" (publishing in best/elite journal) is fundamentally different from having high traditional career metrics. 
+This suggests two distinct career success dimensions in your data.

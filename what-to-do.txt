@@ -11,17 +11,7 @@ nerep_oniMuj
 mosaic plots
 
 4) PCA pro obor_
-obor_dotovany
-obor_konkuren
-obor_tlak
-obor_rychly
-obor_priliv
-obor_publikac
-obor_medializ
-obor_verejnos
-obor_komplexn
-obor_mensi
-obor_ekzaktnost
+	
 
 5) PCA pro kariera_
 kar_praxe
