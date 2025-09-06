@@ -4,7 +4,13 @@
 obor_ekzaktnost
 spec_hlavni
 
-3) PCA pro obor_
+3) krize_rep vs.
+nerep_jaMuj
+nerep_jaCizi
+nerep_oniMuj
+mosaic plots
+
+4) PCA pro obor_
 obor_dotovany
 obor_konkuren
 obor_tlak
@@ -17,7 +23,7 @@ obor_komplexn
 obor_mensi
 obor_ekzaktnost
 
-4) PCA pro kariera_
+5) PCA pro kariera_
 kar_praxe
 kar_titul
 kar_citace
@@ -25,8 +31,4 @@ kar_nejlepsi
 X kar_kategorie
 X kar_komentar
 
-5) korelace nerep_ s krize_rep
-nerep_jaMuj
-nerep_jaCizi
-nerep_oniMuj
 

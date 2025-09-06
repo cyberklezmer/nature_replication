@@ -339,3 +339,41 @@ analyze_multinom_importance <- function(multinom_model, top_n_detailed = 15, top
 # # Access results
 # View(analysis$importance)
 # View(analysis$results)
+
+# Function to create poLCA formula from column names
+create_polca_formula <- function(data, columns = NULL, exclude = NULL) {
+  
+  # If no columns specified, use all columns
+  if(is.null(columns)) {
+    columns <- names(data)
+  }
+  
+  # Remove excluded columns
+  if(!is.null(exclude)) {
+    columns <- setdiff(columns, exclude)
+  }
+  
+  # Remove non-numeric/non-factor columns (poLCA needs categorical data)
+  # Check which columns are suitable for poLCA
+  suitable_cols <- sapply(columns, function(col) {
+    if(col %in% names(data)) {
+      is.numeric(data[[col]]) || is.factor(data[[col]]) || is.character(data[[col]])
+    } else {
+      FALSE
+    }
+  })
+  
+  columns <- columns[suitable_cols]
+  
+  if(length(columns) == 0) {
+    stop("No suitable columns found for poLCA analysis")
+  }
+  
+  # Create formula: cbind(var1, var2, ...) ~ 1
+  formula_string <- paste0("cbind(", paste(columns, collapse = ", "), ") ~ 1")
+  
+  # Convert to formula object
+  formula_obj <- as.formula(formula_string)
+  
+  return(formula_obj)
+}

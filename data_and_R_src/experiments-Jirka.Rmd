@@ -6,30 +6,7 @@ date: "2025-07-16"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-
-## Encoding: UTF-8
-
-library(dplyr)
-library(readxl)
-library(readr)
-library(tidyr)
-library(forcats)
-library(stringr)
-library(sjmisc)
-library(tibble)
-library(ggplot2)
-library(ggrepel)
-library(knitr)
-source("functions.R")
-
 ```
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-## 
 
 - čísla otázek jsou uvedena v souboru Objektivita přírodních věd - I. část (MU).pdf v adresáři materials
 - propojení názvů a popisu je v souboru názvy-a-popis.xlsx v adresáři data_and_R_src
@@ -43,192 +20,156 @@ b) dále Sociodemografické faktory
 c) Akademická kariéra (Ot 41-48), případně i další otázky: č. 50 podíl základního výzkumu u respondenta, pří. Ot: 49 - podíl věd činnosti u respondenta, Ot 50 - podíl zákl/apl výzkumu, které by tam mohly spadat 
 Metoda: MLR, multinomial log. regression?
 
-```{r}
-# load("../data_src/dataAll.RData")
-load("../data_and_R_src/dataAll.RData")
-complete = data
-# the same filter as in nature.Rmd
-my = filter(complete, cas_sec >= 600, zakl_vyzkum == "Ano")
-# which gives 878 respondents
-```
+After we call prepare-data.Rmd we further process variables:
 
-Slyšel(a)/četl(a) jsem o krizi reprodukovatelnosti jako o vědeckém problému? 
-rep_Ne
-rep_Mainstream
-rep_Casopisy
-rep_Diskuse
-rep_Vlastni
-
-Transform to a new variable rep_kde
+Variables classification into following groups:
+- one dependent variable "krize_rep"
+- explanatory variables:
+  - Likert
+  - ordinal
+  - Boolean
+  - categorical
+  - complicated (will be ignored)
+  - other variables (will be ignored)
 
 ```{r}
-
-```
-
-
-
-Some variables have very rare states we will join them with some other states
-
-```{r}
-library(forcats)
-
-# Create cleaned dataset
-my_clean <- my
-
-# Fix vek: Combine 18-24 with 25-34
-my_clean$vek <- fct_collapse(my_clean$vek,
-  "18–34" = c("18–24", "25–34"),
-  "35–44" = "35–44",
-  "45–54" = "45–54", 
-  "55–64" = "55–64",
-  "65 a více" = "65 a více"
-)
-
-# Fix kar_titul: Combine Bc. with Mgr./Ing.
-my_clean$kar_titul <- fct_collapse(my_clean$kar_titul,
-  "Bc./Mgr./Ing." = c("Bc.", "Mgr./Ing."),
-  "CSc./Ph.D." = "CSc./Ph.D.",
-  "Docent" = "Docent",
-  "DrSc./DSc." = "DrSc./DSc.",
-  "Profesor" = "Profesor"
-)
-
-# Fix pomer_veda: Combine 10% with 20%
-my_clean$pomer_veda <- fct_collapse(my_clean$pomer_veda,
-  "10–20%" = c("10%", "20%"),
-  "30%" = "30%",
-  "40%" = "40%",
-  "50%" = "50%",
-  "60%" = "60%",
-  "70%" = "70%",
-  "80%" = "80%",
-  "90%" = "90%",
-  "100%" = "100%"
-)
-
-# Fix pomer_zakladni: Combine 10% and 20%
-my_clean$pomer_zakladni <- fct_collapse(my_clean$pomer_zakladni,
-  "10–20%" = c("10%", "20%"),
-  "30%" = "30%",
-  "40%" = "40%",
-  "50%" = "50%",
-  "60%" = "60%",
-  "70%" = "70%",
-  "80%" = "80%",
-  "90%" = "90%",
-  "100%" = "100%"
-)
-
-# Fix obor_tlak: Combine "Rozhodně ne" with "Spíše ne"
-my_clean$obor_tlak <- fct_collapse(my_clean$obor_tlak,
-  "Ne (rozhodně/spíše)" = c("Rozhodně ne", "Spíše ne"),
-  "Nevím" = "Nevím",
-  "Spíše ano" = "Spíše ano",
-  "Rozhodně ano" = "Rozhodně ano"
-)
-
-# Check the new distributions
-cat("=== After cleaning ===\n")
-for(var in c("vek", "kar_titul", "pomer_veda", "pomer_zakladni", "obor_tlak")) {
-  cat("\n", var, ":\n")
-  print(table(my_clean[[var]]))
-}
-
 my <- my_clean
-```
-The mosaic plots of potentially significant variables directly from data
 
-```{r}
-# Save current par settings
-old_par <- par(no.readonly = TRUE)
-# Adjust margins (bottom, left, top, right)
-par(mar = c(2, 2, 4, 2))  # Increase top margin
+dependent.var <- "krize_rep"
+# If we want to make dependent variable ordinal
+my[[dependent.var]] <- ordered(my[[dependent.var]],
+                              levels = c("Ano, významná krize","Ano, nevýznamná krize","Nevím","Ne, žádná krize není"))
+  barplot(table(my[,dependent.var]),cex.names = 0.8)
 
-var.names <- c("vek", "pomer_zakladni", "obor_tlak", "obor_dotovany", "kar_citace",
-               "spec_hlavni", "kar_titul", "obor_medializ", "obor_rychly",
-               "nerep_narust", "nerep_problem", "nerep_chyba", "nerep_veda",
-               "nerep_valid", "nerep_neobj")
-eng.var.names <- c("Age group", "Proportion of Basic Research", "Extraordinary Pressure to Achieve Results",
-                   "Heavily Subsidized Field", "Number of Citations", "Research Field", "Professional Degree", "Highly visible field","Rapidly Changing Field",
-                   "Increasing Research Irreproducibility", "My Discipline-Specific Reproducibility Crisis", "Non-Replicable Results as Error Indicators",
-                   "Irreproducible Results as Scientific Process", "Irreproducibility Rarely Invalidates Original Findings", "Irreproducibility Undermining Scientific Objectivity")
-for (i in 1:length(var.names)){
-  var.name <- var.names[i]
-  eng.var.name <- eng.var.names[i]
-  fname <- paste(var.name,".pdf",sep="")
-  pdf(file=fname)
-    my.tab <- table(my[,c(var.name, dependent.var)])
-    colnames(my.tab) <- c("Yes, significant crisis", 
-                     "Yes, minor crisis", 
-                     "I don't know", 
-                     "No, there is no crisis")
-    if (var.name=="obor_tlak"){
-      rownames(my.tab) <- c("Definitely/Rather not", 
-                   "I don't know", 
-                   "Rather yes", 
-                   "Definitely yes")
-    }
-    if (var.name=="obor_dotovany" | var.name=="obor_medializ" | var.name=="obor_rychly"){
-      rownames(my.tab) <- c("Definitely not", 
-                   "Rather not", 
-                   "I don't know", 
-                   "Rather yes", 
-                   "Definitely yes")
-    }
-    if (var.name=="kar_citace"){
-      rownames(my.tab) <- c("Up to 100", "Up to 500", "Up to 1000", "Up to 5000", "More than 5000")
-    }
-    if (is.element(var.name,c("nerep_narust", "nerep_problem", "nerep_chyba", "nerep_veda",
-               "nerep_valid", "nerep_neobj"))){
-      rownames(my.tab) <- c("Neutral", "Don't know", "Strongly disagree", "Strongly agree", "Somewhat disagree", "Somewhat agree")
-      my.tab <- my.tab[c(3,5,2,1,6,4),]
-    }
-    mosaicplot(my.tab,col = c(4,6,7,8),main="", dir=c("h","v"), las=2, 
-             xlab="Is there a replication crisis?", ylab=eng.var.name)
-  dev.off()
+explanatory.vars <- c(
+"spec_hlavni",
+"gender",           
+"vek",          
+"kar_praxe",
+"kar_titul",       
+"kar_citace",      
+"kar_nejlepsi",     
+"kar_kategorie",
+"pomer_veda",
+"pomer_zakladni",
+"obor_dotovany",
+"obor_konkuren",
+"obor_tlak",
+"obor_rychly",
+"obor_priliv",
+"obor_publikac",
+"obor_medializ",
+"obor_verejnos",
+"obor_komplexn",
+"obor_mensi",
+"cinnost_matem",
+"cinnost_model",
+"cinnost_teori",
+"cinnost_exper",
+"cinnost_kateg",
+"cinnost_vyvoj",
+"obor_ekzaktnost")
+
+# Když máme "spec_hlavni" (10 kategorií) asi už nechceme "obor" (12 kategorií, navíc podivných) 
+# Jak se liší Aplikovaná fyzika od Sekce aplikované fyziky? Třeba spojit do jedné.
+# Podobně u ostatních - nakonec vede na 6 oborů (sekcí)
+other.vars <- c("obor")
+
+# Nyní specifikujeme, které vysvětlující veličiny explanatory.vars se mohou chápat pomocí Likertovy škály.
+# Veličiny mají 5 odpovědí, ale Exaktnost má pouze 3 odpovědi.
+# Jak zacházet s odpovědí "Nevím"? 
+# Spíše než NA jako s neutrálním stavem?
+# Je třeba stanovit uspořádání 
+likert.vars <- c(
+"obor_dotovany",
+"obor_konkuren",
+"obor_tlak",
+"obor_rychly",
+"obor_priliv",
+"obor_publikac",
+"obor_medializ",
+"obor_verejnos",
+"obor_komplexn",
+"obor_mensi",
+"obor_ekzaktnost"
+)
+for (i in 1:(length(likert.vars)-1)){
+  my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
+                                  levels = c("Rozhodně ne", "Spíše ne", "Nevím", "Spíše ano", "Rozhodně ano"))
+}
+# the last Likert variable has different states
+i <- length(likert.vars)
+my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
+                                  levels = c("„Měkčí“ (méně exaktní)", "Nedokážu posoudit", "„Tvrdší“ (exaktnější)"))
+levels(my[[likert.vars[i]]]) <-  c("Spíše ne", "Nevím", "Spíše ano")
+
+# Nyní specifikujeme, které vysvětlující veličiny explanatory.vars se nemohou chápat pomocí Likertovy škály, ale jsou ordinální.
+ordinal.vars <- c(
+"vek",          
+"kar_praxe",
+"kar_titul",       
+"kar_citace",      
+"pomer_veda",
+"pomer_zakladni",
+"cinnost_matem",
+"cinnost_model",
+"cinnost_teori",
+"cinnost_exper",
+"cinnost_kateg",
+"cinnost_vyvoj")
+# u ordinálních veličin musíme správně nastavit uspořádání jejich hodnot
+my[[ordinal.vars[1]]] <- ordered(my[[ordinal.vars[1]]], 
+                                  levels = c("18–24","25–34","35–44","45–54","55–64","65 a více"))
+my[[ordinal.vars[2]]] <- ordered(my[[ordinal.vars[2]]], 
+                                  levels = c("Méně než 5 let","5–9 let","10–19 let","20 a více let"))
+my[[ordinal.vars[3]]] <- ordered(my[[ordinal.vars[3]]], 
+                                  levels = c("Bc.","Mgr./Ing.","CSc./Ph.D.","Docent","DrSc./DSc.","Profesor"))
+my[[ordinal.vars[4]]] <- ordered(my[[ordinal.vars[4]]], 
+                                  levels = c("Do 100","Do 500","Do 1000","Do 5000","Více"))
+for (i in 5:6){
+  my[!is.na(my[,ordinal.vars[i]]) & my[,ordinal.vars[i]]=="Nevím", ordinal.vars[5]] <- NA
+  my[[ordinal.vars[i]]] <- ordered(my[[ordinal.vars[i]]], 
+                                    levels = c("10%","20%","30%","40%","50%","60%","70%","80%","90%","100%"))
+}
+for (i in 7:12){
+  my[[ordinal.vars[i]]] <- ordered(my[[ordinal.vars[i]]], 
+                                    levels = c("1. místo","2. místo","3. místo","Tuto činnost nedělám"))
 }
 
-# Restore original settings
-par(old_par)
-```
+boolean.vars <- c(
+  "kar_nejlepsi")
 
-Mosaic plot: obor_ekzaktnost vs. spec_hlavni
+# Velmi složité najít uspořádání u veličiny kar_kategorie, která má 27 různých hodnot.
+# Nebudeme ji používat.
+complicated.vars <- c(
+  "kar_kategorie")
 
-```{r, echo=FALSE}
+# zbylé veličiny jsou kategorické 
+categorical.vars <- setdiff(explanatory.vars,union(likert.vars,union(ordinal.vars,union(boolean.vars,complicated.vars))))
 
-# Save current par settings
-old_par <- par(no.readonly = TRUE)
-# Adjust margins (bottom, left, top, right)
-par(mar = c(2, 2, 4, 2))  # Increase top margin
+# For spec_hlavni - create shorter, cleaner names
+my$spec_hlavni <- factor(my$spec_hlavni,
+                         levels = c("Chemistry", "Biology", "Engineering", "Medicine", 
+                                    "Mathematics", "Other specialization", "Materials Science", 
+                                    "Physics", "Earth and Environmental Science", 
+                                    "Astronomy and Planetary Science"),
+                         labels = c("Chemistry", "Biology", "Engineering", "Medicine", 
+                                    "Mathematics", "Other", "Materials", 
+                                    "Physics", "Earth_Env", "Astronomy"))
 
-var.name <- "obor_ekzaktnost"
-eng.var.name <- "precision of the field"
-var2.name <- "spec_hlavni"
-eng.var2.name <- "main specialization"
-fname <- paste(var.name,".pdf",sep="")
-pdf(file=fname)
-my.tab <- table(my[,c(var2.name, var.name)])
-colnames(my.tab) <- c("less exact", 
-                      "rather exact", 
-                      "I cannot judge")
-my.tab <-  my.tab[,c("less exact", "I cannot judge", "rather exact")]
-my.tab <- my.tab[order(my.tab[,"rather exact"]/rowSums(my.tab[])),]
-mosaicplot(my.tab, col = c(4,7,6), main="", dir=c("h","v"), las=2, xlab=eng.var.name, ylab=eng.var2.name)
-dev.off()
+# Set treatment contrasts also for ordered factors
+# options(contrasts = c("contr.treatment", "contr.treatment"))
+# This is the default:
+options(contrasts = c("contr.treatment", "contr.poly"))
 
-# Restore original settings
-par(old_par)
 
 ```
-
-Correlation analysis
-
 ```{r}
-# Better approach - separate treatment for different variable types
-library(psych)
+library(corrplot)
 
 # Prepare the data
-my.vars.prepared <- my_clean
+vars <- union(setdiff(explanatory.vars,complicated.vars),"krize_rep")
+my.vars.prepared <- my[,vars]
 # my.vars.prepared <- my.vars
 
 # Convert ordered factors to numeric (these are ordinal)
@@ -243,32 +184,22 @@ if("kar_nejlepsi" %in% names(my.vars.prepared)) {
   my.vars.prepared$kar_nejlepsi <- as.numeric(as.factor(my.vars.prepared$kar_nejlepsi))
 }
 
-# spec_hlavni: nominal categorical (10 levels) - might want to exclude from correlation
-# if("spec_hlavni" %in% names(my.vars.prepared)) {
-#   my.vars.prepared$spec_hlavni <- as.numeric(as.factor(my.vars.prepared$spec_hlavni))
-# }
-
 # gender: nominal categorical (3 levels)
 if("gender" %in% names(my.vars.prepared)) {
   my.vars.prepared$gender <- as.numeric(as.factor(my.vars.prepared$gender))
 }
 
-# You might want to exclude spec_hlavni since it's purely nominal with many categories
-my.vars.for_cor <- my.vars.prepared[, !names(my.vars.prepared) %in% "spec_hlavni"]
+# We exclude spec_hlavni from correlation computations since it's purely nominal with many categories (10 levels)
+if("spec_hlavni" %in% names(my.vars.prepared)) {
+  my.vars.for_cor <- my.vars.prepared[, !names(my.vars.prepared) %in% "spec_hlavni"]
+}
 
 print("Variables for correlation analysis:")
 print(names(my.vars.for_cor))
 
-# Compute correlation matrix
-cor_matrix <- cor(my.vars.for_cor, use = "complete.obs")
-print("Correlation matrix:")
-print(round(cor_matrix, 3))
-
-# Create a more readable correlation matrix
-library(corrplot)
-
 # Compute correlations
 cor_matrix <- cor(my.vars.for_cor, use = "pairwise.complete")
+
 # Reorder the correlation matrix to put krize_rep first
 desired_order <- c("krize_rep", setdiff(colnames(cor_matrix), "krize_rep"))
 cor_matrix <- cor_matrix[desired_order, desired_order]
@@ -280,18 +211,7 @@ corrplot(cor_matrix, method = "color", type = "upper",
          tl.cex = 0.8, tl.col = "black", order="original")
 dev.off()
 
-# Or create a simple heatmap
-# Create heatmap with smaller labels
-heatmap(cor_matrix, 
-        symm = TRUE,
-        cexRow = 0.4,     # Row label size (smaller = more readable)
-        cexCol = 0.4,     # Column label size
-        margins = c(10, 10), # Increase margins to fit labels
-        Rowv = NA,        # Disable row clustering
-        Colv = NA)  # Disable column clustering
-
 ```
-
 The Fruchterman-Reingold algorithm visualizing correlation networks
 
 ```{r}
@@ -303,7 +223,7 @@ threshold <- 0.15
 library(igraph)
 
 # Create adjacency matrix with ABSOLUTE values
-adj_matrix <- abs(cor_matrix_ordered)
+adj_matrix <- abs(cor_matrix)
 adj_matrix[adj_matrix < threshold] <- 0
 diag(adj_matrix) <- 0
 
@@ -313,7 +233,7 @@ cor_graph <- graph_from_adjacency_matrix(adj_matrix,
                                         weighted = TRUE)
 
 # Get edge list and extract original correlation values
-edge_list <- get.edgelist(cor_graph)
+edge_list <- as_edgelist(cor_graph)
 original_correlations <- sapply(1:nrow(edge_list), function(i) {
   v1 <- edge_list[i, 1]
   v2 <- edge_list[i, 2]
@@ -348,6 +268,8 @@ legend("topright",
 dev.off()
 
 ```
+
+
 
 Correlation including Halm's correction
 
@@ -555,7 +477,7 @@ plot(network,
      main = "Correlation Network (Holm-corrected, Fruchterman-Reingold Layout)")
 
 # Add legend
-legend("topright", 
+legend("topleft", 
        legend = c("Positive correlation", "Negative correlation", "Thicker = Stronger"),
        col = c("red", "blue", "black"),
        lty = c(1, 1, 1),
@@ -585,7 +507,6 @@ print(round(p_matrix_adjusted[1:min(5,nrow(p_matrix_adjusted)), 1:min(5,ncol(p_m
 ```
 
 
-BN structure learning
 
 ```{r}
 library(bnlearn)
@@ -734,145 +655,6 @@ system('"C:/Program Files/Graphviz/bin/dot.exe" -Tpdf network.dot -o cpdag-of-ba
 
 ```
 
-Variables classification into following groups:
-- one dependent variable "krize_rep"
-- explanatory variables:
-  - Likert
-  - ordinal
-  - Boolean
-  - categorical
-  - complicated (will be ignored)
-  - other variables (will be ignored)
-
-```{r}
-dependent.var <- "krize_rep"
-# If we want to make dependent variable ordinal
-my[[dependent.var]] <- ordered(my[[dependent.var]],
-                              levels = c("Ano, významná krize","Ano, nevýznamná krize","Nevím","Ne, žádná krize není"))
-  barplot(table(my[,dependent.var]),cex.names = 0.8)
-
-explanatory.vars <- c(
-"spec_hlavni",
-"gender",           
-"vek",          
-"kar_praxe",
-"kar_titul",       
-"kar_citace",      
-"kar_nejlepsi",     
-"kar_kategorie",
-"pomer_veda",
-"pomer_zakladni",
-"obor_dotovany",
-"obor_konkuren",
-"obor_tlak",
-"obor_rychly",
-"obor_priliv",
-"obor_publikac",
-"obor_medializ",
-"obor_verejnos",
-"obor_komplexn",
-"obor_mensi",
-"cinnost_matem",
-"cinnost_model",
-"cinnost_teori",
-"cinnost_exper",
-"cinnost_kateg",
-"cinnost_vyvoj",
-"obor_ekzaktnost")
-
-# Když máme "spec_hlavni" (10 kategorií) asi už nechceme "obor" (12 kategorií, navíc podivných) 
-# Jak se liší Aplikovaná fyzika od Sekce aplikované fyziky? Třeba spojit do jedné.
-# Podobně u ostatních - nakonec vede na 6 oborů (sekcí)
-other.vars <- c("obor")
-
-# Nyní specifikujeme, které vysvětlující veličiny explanatory.vars se mohou chápat pomocí Likertovy škály.
-# Veličiny mají 5 odpovědí, ale Exaktnost má pouze 3 odpovědi.
-# Jak zacházet s odpovědí "Nevím"? 
-# Spíše než NA jako s neutrálním stavem?
-# Je třeba stanovit uspořádání 
-likert.vars <- c(
-"obor_dotovany",
-"obor_konkuren",
-"obor_tlak",
-"obor_rychly",
-"obor_priliv",
-"obor_publikac",
-"obor_medializ",
-"obor_verejnos",
-"obor_komplexn",
-"obor_mensi",
-"obor_ekzaktnost"
-)
-for (i in 1:(length(likert.vars)-1)){
-  my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
-                                  levels = c("Rozhodně ne", "Spíše ne", "Nevím", "Spíše ano", "Rozhodně ano"))
-}
-# the last Likert variable has different states
-i <- length(likert.vars)
-my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
-                                  levels = c("„Měkčí“ (méně exaktní)", "Nedokážu posoudit", "„Tvrdší“ (exaktnější)"))
-levels(my[[likert.vars[i]]]) <-  c("Spíše ne", "Nevím", "Spíše ano")
-
-# Nyní specifikujeme, které vysvětlující veličiny explanatory.vars se nemohou chápat pomocí Likertovy škály, ale jsou ordinální.
-ordinal.vars <- c(
-"vek",          
-"kar_praxe",
-"kar_titul",       
-"kar_citace",      
-"pomer_veda",
-"pomer_zakladni",
-"cinnost_matem",
-"cinnost_model",
-"cinnost_teori",
-"cinnost_exper",
-"cinnost_kateg",
-"cinnost_vyvoj")
-# u ordinálních veličin musíme správně nastavit uspořádání jejich hodnot
-my[[ordinal.vars[1]]] <- ordered(my[[ordinal.vars[1]]], 
-                                  levels = c("18–24","25–34","35–44","45–54","55–64","65 a více"))
-my[[ordinal.vars[2]]] <- ordered(my[[ordinal.vars[2]]], 
-                                  levels = c("Méně než 5 let","5–9 let","10–19 let","20 a více let"))
-my[[ordinal.vars[3]]] <- ordered(my[[ordinal.vars[3]]], 
-                                  levels = c("Bc.","Mgr./Ing.","CSc./Ph.D.","Docent","DrSc./DSc.","Profesor"))
-my[[ordinal.vars[4]]] <- ordered(my[[ordinal.vars[4]]], 
-                                  levels = c("Do 100","Do 500","Do 1000","Do 5000","Více"))
-for (i in 5:6){
-  my[!is.na(my[,ordinal.vars[i]]) & my[,ordinal.vars[i]]=="Nevím", ordinal.vars[5]] <- NA
-  my[[ordinal.vars[i]]] <- ordered(my[[ordinal.vars[i]]], 
-                                    levels = c("10%","20%","30%","40%","50%","60%","70%","80%","90%","100%"))
-}
-for (i in 7:12){
-  my[[ordinal.vars[i]]] <- ordered(my[[ordinal.vars[i]]], 
-                                    levels = c("1. místo","2. místo","3. místo","Tuto činnost nedělám"))
-}
-
-boolean.vars <- c(
-  "kar_nejlepsi")
-
-# Velmi složité najít uspořádání u veličiny kar_kategorie, která má 27 různých hodnot.
-# Nebudeme ji používat.
-complicated.vars <- c(
-  "kar_kategorie")
-
-# zbylé veličiny jsou kategorické 
-categorical.vars <- setdiff(explanatory.vars,union(likert.vars,union(ordinal.vars,union(boolean.vars,complicated.vars))))
-
-# For spec_hlavni - create shorter, cleaner names
-my$spec_hlavni <- factor(my$spec_hlavni,
-                         levels = c("Chemistry", "Biology", "Engineering", "Medicine", 
-                                    "Mathematics", "Other specialization", "Materials Science", 
-                                    "Physics", "Earth and Environmental Science", 
-                                    "Astronomy and Planetary Science"),
-                         labels = c("Chemistry", "Biology", "Engineering", "Medicine", 
-                                    "Mathematics", "Other", "Materials", 
-                                    "Physics", "Earth_Env", "Astronomy"))
-
-# Set treatment contrasts also for ordered factors
-# options(contrasts = c("contr.treatment", "contr.treatment"))
-# This is the default:
-options(contrasts = c("contr.treatment", "contr.poly"))
-
-```
 
 Multinomial Regression using nnet package 
 
@@ -1097,6 +879,7 @@ pearson_cor <- cor(as.numeric(final_predictions), as.numeric(actual_outcomes),
 print(paste("Pearson  correlation:", round(pearson_cor, 3)))
 
 ```
+
 Model parameters
 
 ```{r}
@@ -1895,4 +1678,90 @@ print("\nGrouped by Original Variables:")
 print(grouped_importance)
 
 ```
+
+Latent Class Analysis
+
+```{r}
+library(poLCA)
+f <- create_polca_formula(my.vars.for_cor)
+min_bic <- Inf
+bic.values <- rep(0,8-2+1)
+for(i in 2:8){
+  lc <- poLCA(f, data = my.vars.for_cor, nclass=i, maxiter=3000, 
+              tol=1e-5, na.rm=FALSE,  
+              nrep=10, verbose=TRUE, calc.se=TRUE)
+  bic.values[i-1] <- lc$bic 
+  if(lc$bic < min_bic){
+    min_bic <- lc$bic
+    LCA_best_model<-lc
+  }
+}    	
+LCA_best_model
+# conditional probabilities
+LCA_best_model$probs$B1
+# ...
+LCA_best_model$probs$C16
+# prior class probabilities
+LCA_best_model$P
+
+pdf(file="LCA-BIC-values.pdf", width=5,height=4)
+  plot(x=2:8,y=-bic.values, xlab="number of latent classes", ylab="BIC value",type="l", lwd=2)
+  grid()
+dev.off()
+
+
+
+```
+Claude's comment to the output:
+Looking at this poLCA output, here's my interpretation of the 3-class model:
+
+## Class Characteristics
+
+**Class 1 (25.6% of sample): "Senior Established Researchers"**
+- **Demographics**: Older (high probability in age categories 3-6), mostly male (67.3%), more experienced
+- **Career**: High citations (balanced across categories), senior positions (kar_praxe: 42.2% category 3, 38.1% category 4)
+- **Research style**: More mathematical/modeling work, less experimental
+- **Field characteristics**: Work in highly funded, competitive, high-pressure fields
+
+**Class 2 (47.6% of sample): "Junior/Mid-career Researchers"** 
+- **Demographics**: Younger (93.9% in age category 3), mixed gender (58.2% male)
+- **Career**: Lower citations (50.2% in lowest category), earlier career stages
+- **Research style**: Less mathematical, more varied activities
+- **Field characteristics**: Work in less competitive, more accessible fields
+
+**Class 3 (26.8% of sample): "Elite Senior Researchers"**
+- **Demographics**: Oldest group, predominantly male (84.8%)
+- **Career**: Highest citations and seniority (88.4% in top kar_praxe category)
+- **Research style**: Mixed mathematical/experimental approaches
+- **Field characteristics**: Highly competitive and well-funded fields
+
+## Key Distinguishing Variables
+
+**Most important variables for class differentiation:**
+
+1. **Age (vek)**: Clear age stratification across classes
+2. **Career experience (kar_praxe)**: Strong predictor of class membership  
+3. **Citations (kar_citace)**: Classes 1 & 3 have higher citation patterns
+4. **Field funding (obor_dotovany)**: Class 1 works in highly funded fields
+5. **Mathematical activity (cinnost_matem)**: Higher in senior classes
+
+## Relation to Crisis of Representation (krize_rep)
+
+**This is the crucial finding for your analysis:**
+
+- **Class 1**: 50.8% report no crisis, 30.2% mild crisis → **Lower crisis perception**
+- **Class 2**: More evenly distributed (29.8% no crisis, 36.7% moderate crisis) → **Higher crisis awareness** 
+- **Class 3**: Most distributed across all levels (22.5% no crisis, 22.0% severe crisis) → **Mixed/polarized views**
+
+## Key Interpretations
+
+**The crisis of representation varies significantly by researcher profile:**
+
+1. **Senior established researchers** (Class 1) are less likely to perceive a representation crisis
+2. **Junior/mid-career researchers** (Class 2) are most aware of representation issues
+3. **Elite senior researchers** (Class 3) show the most polarized views - some see no crisis while others see it as severe
+
+**This suggests that career stage and institutional position influence perception of representation crises.** The middle-career group may be most sensitive to these issues, possibly because they're actively navigating career advancement and facing these pressures directly.
+
+The model fit statistics suggest this is a reasonable solution, though the large sample size makes goodness-of-fit tests less reliable. The clear differentiation in krize_rep across classes indicates this latent class structure captures meaningful variation in your key outcome variable.
 

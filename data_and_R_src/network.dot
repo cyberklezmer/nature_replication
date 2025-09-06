@@ -3,10 +3,13 @@ digraph BN {
   node [shape="ellipse", style="filled", fillcolor="lightsteelblue", 
         color="navy", fontcolor="black", fontname="Arial", fontsize="12"];
   
-  "krize_rep" [label="krize_rep"];
+  "gender" [label="gender"];
+  "kar_praxe" [label="kar_praxe"];
+  "kar_citace" [label="kar_citace"];
+  "kar_nejlepsi" [label="kar_nejlepsi"];
+  "pomer_zakladni" [label="pomer_zakladni"];
   "obor_dotovany" [label="obor_dotovany"];
   "obor_konkuren" [label="obor_konkuren"];
-  "obor_tlak" [label="obor_tlak"];
   "obor_rychly" [label="obor_rychly"];
   "obor_priliv" [label="obor_priliv"];
   "obor_publikac" [label="obor_publikac"];
@@ -14,39 +17,28 @@ digraph BN {
   "obor_verejnos" [label="obor_verejnos"];
   "obor_komplexn" [label="obor_komplexn"];
   "obor_mensi" [label="obor_mensi"];
-  "obor_ekzaktnost" [label="obor_ekzaktnost"];
-  "vek" [label="vek"];
-  "kar_praxe" [label="kar_praxe"];
-  "kar_titul" [label="kar_titul"];
-  "kar_citace" [label="kar_citace"];
-  "pomer_zakladni" [label="pomer_zakladni"];
   "cinnost_exper" [label="cinnost_exper"];
-  "kar_nejlepsi" [label="kar_nejlepsi"];
-  "gender" [label="gender"];
+  "obor_ekzaktnost" [label="obor_ekzaktnost"];
+  "krize_rep" [label="krize_rep"];
   "spec_hlavni" [label="spec_hlavni"];
 
-  // Directed edges
-  "vek" -> "kar_titul" [arrowhead="vee", color="darkblue", penwidth="2"];
-  "kar_citace" -> "kar_titul" [arrowhead="vee", color="darkblue", penwidth="2"];
 
   // Undirected edges
-  "krize_rep" -> "obor_tlak" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "krize_rep" -> "vek" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "gender" -> "kar_citace" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "kar_praxe" -> "kar_citace" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "kar_praxe" -> "krize_rep" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "kar_citace" -> "kar_nejlepsi" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "kar_nejlepsi" -> "pomer_zakladni" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_dotovany" -> "obor_priliv" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_dotovany" -> "obor_medializ" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_dotovany" -> "cinnost_exper" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "obor_konkuren" -> "obor_tlak" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_konkuren" -> "obor_priliv" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_konkuren" -> "obor_komplexn" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_konkuren" -> "obor_mensi" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "obor_konkuren" -> "krize_rep" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_rychly" -> "obor_priliv" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_priliv" -> "obor_publikac" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_medializ" -> "obor_verejnos" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "obor_ekzaktnost" -> "spec_hlavni" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "vek" -> "kar_praxe" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "kar_praxe" -> "kar_citace" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "kar_citace" -> "kar_nejlepsi" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "kar_citace" -> "gender" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "pomer_zakladni" -> "spec_hlavni" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "cinnost_exper" -> "spec_hlavni" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "obor_ekzaktnost" -> "spec_hlavni" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
 }
