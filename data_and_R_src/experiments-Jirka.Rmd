@@ -6,6 +6,7 @@ date: "2025-07-16"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+source("functions.R")
 ```
 
 - čísla otázek jsou uvedena v souboru Objektivita přírodních věd - I. část (MU).pdf v adresáři materials
@@ -102,6 +103,15 @@ i <- length(likert.vars)
 my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
                                   levels = c("„Měkčí“ (méně exaktní)", "Nedokážu posoudit", "„Tvrdší“ (exaktnější)"))
 levels(my[[likert.vars[i]]]) <-  c("Spíše ne", "Nevím", "Spíše ano")
+
+# the variable "obor_mensi" is replaced by "obor_vetsi" with complementary values
+my$obor_vetsi <- my$obor_mensi
+levels(my$obor_vetsi) <- c("Rozhodně ano", "Spíše ano", "Nevím", "Spíše ne", "Rozhodně ne")
+my$obor_vetsi <- ordered(my$obor_vetsi, levels=c("Rozhodně ne", "Spíše ne", "Nevím", "Spíše ano", "Rozhodně ano"))
+explanatory.vars[explanatory.vars=="obor_mensi"] <- "obor_vetsi"
+likert.vars[likert.vars=="obor_mensi"] <- "obor_vetsi" 
+my <- subset(my,select=-obor_mensi)
+
 
 # Nyní specifikujeme, které vysvětlující veličiny explanatory.vars se nemohou chápat pomocí Likertovy škály, ale jsou ordinální.
 ordinal.vars <- c(
@@ -237,7 +247,7 @@ edge_list <- as_edgelist(cor_graph)
 original_correlations <- sapply(1:nrow(edge_list), function(i) {
   v1 <- edge_list[i, 1]
   v2 <- edge_list[i, 2]
-  return(cor_matrix_ordered[v1, v2])
+  return(cor_matrix[v1, v2])
 })
 
 # Add original correlations as edge attribute
@@ -512,7 +522,7 @@ print(round(p_matrix_adjusted[1:min(5,nrow(p_matrix_adjusted)), 1:min(5,ncol(p_m
 library(bnlearn)
 my.vars.bn <- my.vars.for_cor
 # if we want to consider also this variable with 10 values
-my.vars.bn <- cbind(my.vars.for_cor, my.vars$spec_hlavni)
+my.vars.bn <- cbind(my.vars.for_cor, my_clean$spec_hlavni)
 colnames(my.vars.bn) <- c(colnames(my.vars.bn)[-length(colnames(my.vars.bn))],"spec_hlavni")
 
 # Convert all columns to factors at once
@@ -1783,7 +1793,7 @@ Latent Class Analysis (more suitable than cluster analysis for nominal data in s
 library(poLCA)
 
 # if we want to consider also this variable with 10 values
-my.vars.bn <- cbind(my.vars.for_cor, my.vars$spec_hlavni)
+my.vars.bn <- cbind(my.vars.for_cor, my_clean$spec_hlavni)
 colnames(my.vars.bn) <- c(colnames(my.vars.bn)[-length(colnames(my.vars.bn))],"spec_hlavni")
 # Convert all columns to factors at once
 my.vars.bn.discrete <- as.data.frame(lapply(my.vars.bn, as.factor))
@@ -1815,22 +1825,64 @@ pdf(file="LCA-BIC-values.pdf", width=5,height=4)
 dev.off()
 ```
 
+Find variables most related to the latent class
+
+```{r}
+library(DescTools)
+lng <- length(LCA_best_model$probs)
+rr <- rep(0,lng)
+names(rr) <- names(LCA_best_model$probs)
+for (i in 1:lng){
+  cpt <- LCA_best_model$probs[i][[1]]
+  pt  <- cpt * matrix(rep(LCA_best_model$P,ncol(cpt)),nrow=3,ncol=ncol(cpt))
+  rr[i] <- CramerV(pt)
+}
+sort(rr,decreasing = TRUE)
+
+pc <- matrix(0,ncol=length(LCA_best_model$P),nrow=lng)
+rownames(pc) <- names(LCA_best_model$probs)
+colnames(pc) <- rownames(LCA_best_model$probs[1][[1]])
+sc <- pc
+for (i in 1:lng){
+  cpt <- LCA_best_model$probs[i][[1]]
+  pc[i,] <- apply(cpt,1,max)
+  sc[i,] <- apply(cpt,1,which.max)
+}
+pco <- matrix(0,ncol=length(LCA_best_model$P),nrow=lng)
+colnames(pco) <- rownames(LCA_best_model$probs[1][[1]])
+pco <- pc
+sco <- sc
+varo <- pc
+for (c in 1:ncol(pc)){
+  o <- order(pc[,c],decreasing = TRUE)
+  pco[,c] <- pc[,c][o]
+  sco[,c] <- sc[,c][o]
+  varo[,c] <- rownames(pc)[o]
+}
+rownames(pco) <- NULL
+rownames(sco) <- NULL
+rownames(varo) <- NULL
+```
+
+
 ```{r}
 # Calculate actual values from your poLCA results for bubble plot
+# LCA_best_model$
 # Assuming your poLCA model is stored as 'mod1' or similar
 
 # 1. EXPERIMENTAL INTENSITY (cinnost_exper) - weighted average for each class
-# From your output: cinnost_exper has levels 1,2,3,4
-experimental_intensity <- c(
-  # Class 1: 0.6680*1 + 0.1808*2 + 0.1210*3 + 0.0302*4
-  0.6680*1 + 0.1808*2 + 0.1210*3 + 0.0302*4,
-  
-  # Class 2: 0.5374*1 + 0.2241*2 + 0.1109*3 + 0.1276*4  
-  0.5374*1 + 0.2241*2 + 0.1109*3 + 0.1276*4,
-  
-  # Class 3: 0.4448*1 + 0.1894*2 + 0.1275*3 + 0.2383*4
-  0.4448*1 + 0.1894*2 + 0.1275*3 + 0.2383*4
-)
+# LCA_best_model$probs$cinnost_exper has levels 1,2,3,4
+# experimental_intensity <- c(
+#   # Class 1: 0.6680*1 + 0.1808*2 + 0.1210*3 + 0.0302*4
+#   0.6680*1 + 0.1808*2 + 0.1210*3 + 0.0302*4,
+#   
+#   # Class 2: 0.5374*1 + 0.2241*2 + 0.1109*3 + 0.1276*4  
+#   0.5374*1 + 0.2241*2 + 0.1109*3 + 0.1276*4,
+#   
+#   # Class 3: 0.4448*1 + 0.1894*2 + 0.1275*3 + 0.2383*4
+#   0.4448*1 + 0.1894*2 + 0.1275*3 + 0.2383*4
+# )
+experimental_intensity <- LCA_best_model$probs$cinnost_exper %*% 1:4
 
 print("Experimental Intensity by Class:")
 print(paste("Class 1:", round(experimental_intensity[1], 2)))
@@ -1839,16 +1891,17 @@ print(paste("Class 3:", round(experimental_intensity[3], 2)))
 
 # 2. CRISIS PERCEPTION (krize_rep) - weighted average for each class
 # From your output: krize_rep has levels 1,2,3,4
-crisis_perception <- c(
-  # Class 1: 0.5111*1 + 0.2997*2 + 0.1181*3 + 0.0711*4
-  0.5111*1 + 0.2997*2 + 0.1181*3 + 0.0711*4,
-  
-  # Class 2: 0.2932*1 + 0.2530*2 + 0.3686*3 + 0.0851*4
-  0.2932*1 + 0.2530*2 + 0.3686*3 + 0.0851*4,
-  
-  # Class 3: 0.2169*1 + 0.2925*2 + 0.2675*3 + 0.2231*4
-  0.2169*1 + 0.2925*2 + 0.2675*3 + 0.2231*4
-)
+# crisis_perception <- c(
+#   # Class 1: 0.5111*1 + 0.2997*2 + 0.1181*3 + 0.0711*4
+#   0.5111*1 + 0.2997*2 + 0.1181*3 + 0.0711*4,
+#   
+#   # Class 2: 0.2932*1 + 0.2530*2 + 0.3686*3 + 0.0851*4
+#   0.2932*1 + 0.2530*2 + 0.3686*3 + 0.0851*4,
+#   
+#   # Class 3: 0.2169*1 + 0.2925*2 + 0.2675*3 + 0.2231*4
+#   0.2169*1 + 0.2925*2 + 0.2675*3 + 0.2231*4
+# )
+crisis_perception <- LCA_best_model$probs$krize_rep %*% 1:4
 
 print("\nCrisis Perception by Class:")
 print(paste("Class 1:", round(crisis_perception[1], 2)))
@@ -1856,9 +1909,9 @@ print(paste("Class 2:", round(crisis_perception[2], 2)))
 print(paste("Class 3:", round(crisis_perception[3], 2)))
 
 # 3. CLASS SIZES (from estimated class population shares)
-class_sizes <- c(0.2669, 0.473, 0.2601)  # From your output
-total_n <- 878  # Total observations
-
+# class_sizes <- c(0.2669, 0.473, 0.2601)  # From your output
+class_sizes <- LCA_best_model$P
+total_n <- nrow(my.vars.bn.discrete) # Total observations
 actual_class_sizes <- class_sizes * total_n
 
 print("\nClass Sizes:")
@@ -1869,16 +1922,20 @@ print(paste("Class 3:", round(actual_class_sizes[3])))
 # 4. FIELD DISTRIBUTIONS by class (from spec_hlavni)
 # Create field groupings for cleaner visualization
 biology_prop <- c(0.5336, 0.3678, 0.2417)  # Biology proportion in each class
+biology_prop <- LCA_best_model$probs$spec_hlavni[,"Biology"]
+
 physics_earth_prop <- c(
   0.0082 + 0.0393 + 0.0952,  # Class 1: Astronomy + Earth + Physics
   0.0050 + 0.1413 + 0.1230,  # Class 2: Astronomy + Earth + Physics  
   0.0175 + 0.1274 + 0.2042   # Class 3: Astronomy + Earth + Physics
 )
-chem_materials_prop <- c(0.1819 + 0.0293, 0.1254 + 0.0979, 0.1238 + 0.0722)
+chem_materials_prop <- LCA_best_model$probs$spec_hlavni[,"Astronomy and Planetary Science"]
++LCA_best_model$probs$spec_hlavni[,"Earth and Environmental Science"]+LCA_best_model$probs$spec_hlavni[,"Physics"]   
+# chem_materials_prop <- c(0.1819 + 0.0293, 0.1254 + 0.0979, 0.1238 + 0.0722)
 
 # Create comprehensive data frame for bubble plot
 bubble_data_calculated <- data.frame(
-  Class = c("Class 1: Elite Math", "Class 2: Early Career", "Class 3: Senior Exp"),
+  Class = c("Class 1: Elite", "Class 2: Early Career", "Class 3: Senior Exp"),
   Crisis_Perception = crisis_perception,
   Experimental_Intensity = experimental_intensity,
   Class_Size = actual_class_sizes,
@@ -1934,7 +1991,7 @@ print(names(bubble_data_calculated))
 
 # Alternative approach - create field data manually to avoid select issues
 field_data <- data.frame(
-  Class = rep(c("Class 1: Elite Math", "Class 2: Early Career", "Class 3: Senior Exp"), each = 3),
+  Class = rep(c("Class 1: Elite", "Class 2: Early Career", "Class 3: Senior Exp"), each = 3),
   Crisis_Perception = rep(crisis_perception, each = 3),
   Experimental_Intensity = rep(experimental_intensity, each = 3),
   Class_Size = rep(actual_class_sizes, each = 3),

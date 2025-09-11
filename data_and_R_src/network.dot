@@ -16,7 +16,7 @@ digraph BN {
   "obor_medializ" [label="obor_medializ"];
   "obor_verejnos" [label="obor_verejnos"];
   "obor_komplexn" [label="obor_komplexn"];
-  "obor_mensi" [label="obor_mensi"];
+  "obor_vetsi" [label="obor_vetsi"];
   "cinnost_exper" [label="cinnost_exper"];
   "obor_ekzaktnost" [label="obor_ekzaktnost"];
   "krize_rep" [label="krize_rep"];
@@ -34,7 +34,7 @@ digraph BN {
   "obor_dotovany" -> "cinnost_exper" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_konkuren" -> "obor_priliv" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_konkuren" -> "obor_komplexn" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "obor_konkuren" -> "obor_mensi" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "obor_konkuren" -> "obor_vetsi" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_konkuren" -> "krize_rep" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_rychly" -> "obor_priliv" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_priliv" -> "obor_publikac" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
