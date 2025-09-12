@@ -1798,10 +1798,11 @@ colnames(my.vars.bn) <- c(colnames(my.vars.bn)[-length(colnames(my.vars.bn))],"s
 # Convert all columns to factors at once
 my.vars.bn.discrete <- as.data.frame(lapply(my.vars.bn, as.factor))
 
-f <- create_polca_formula(my.vars.bn)
+f <- create_polca_formula(my.vars.bn.discrete)
 min_bic <- Inf
 bic.values <- rep(0,8-2+1)
 for(i in 2:8){
+  set.seed(12345)
   lc <- poLCA(f, data = my.vars.bn.discrete, nclass=i, maxiter=3000, 
               tol=1e-5, na.rm=FALSE,  
               nrep=10, verbose=FALSE, calc.se=TRUE)
@@ -1825,23 +1826,39 @@ pdf(file="LCA-BIC-values.pdf", width=5,height=4)
 dev.off()
 ```
 
-Find variables most related to the latent class
+Find variables that are most related to the latent class
 
-```{r}
+```{r, results='hide'}
 library(DescTools)
 lng <- length(LCA_best_model$probs)
 rr <- rep(0,lng)
 names(rr) <- names(LCA_best_model$probs)
 for (i in 1:lng){
   cpt <- LCA_best_model$probs[i][[1]]
+  rownames(cpt) <- substr(rownames(LCA_best_model$probs[1][[1]]), 1, nchar(rownames(LCA_best_model$probs[1][[1]])) - 2)
   pt  <- cpt * matrix(rep(LCA_best_model$P,ncol(cpt)),nrow=3,ncol=ncol(cpt))
   rr[i] <- CramerV(pt)
 }
-sort(rr,decreasing = TRUE)
+rr <- sort(rr,decreasing = TRUE)
 
+for (i in 1:length(rr)){
+  var.name <- names(rr)[i]
+  cpt <- LCA_best_model$probs[var.name][[1]]
+  rownames(cpt) <- substr(rownames(LCA_best_model$probs[1][[1]]), 1, nchar(rownames(LCA_best_model$probs[1][[1]])) - 2)
+  pt  <- cpt * matrix(rep(LCA_best_model$P,ncol(cpt)),nrow=3,ncol=ncol(cpt))
+  fname <- paste("LCA-results/LCA-",i,"-",var.name,".pdf",sep="")
+  pdf(file=fname)
+    mosaicplot(t(pt), col = c(4,7,6), main="", dir=c("h","v"), las=2, ylab=var.name, xlab="latent class")
+  dev.off()
+}
+
+```
+
+
+```{r}
 pc <- matrix(0,ncol=length(LCA_best_model$P),nrow=lng)
 rownames(pc) <- names(LCA_best_model$probs)
-colnames(pc) <- rownames(LCA_best_model$probs[1][[1]])
+colnames(pc) <- substr(rownames(LCA_best_model$probs[1][[1]]), 1, nchar(rownames(LCA_best_model$probs[1][[1]])) - 2)
 sc <- pc
 for (i in 1:lng){
   cpt <- LCA_best_model$probs[i][[1]]
@@ -1921,18 +1938,19 @@ print(paste("Class 3:", round(actual_class_sizes[3])))
 
 # 4. FIELD DISTRIBUTIONS by class (from spec_hlavni)
 # Create field groupings for cleaner visualization
-biology_prop <- c(0.5336, 0.3678, 0.2417)  # Biology proportion in each class
+# biology_prop <- c(0.5336, 0.3678, 0.2417)  # Biology proportion in each class
 biology_prop <- LCA_best_model$probs$spec_hlavni[,"Biology"]
 
-physics_earth_prop <- c(
-  0.0082 + 0.0393 + 0.0952,  # Class 1: Astronomy + Earth + Physics
-  0.0050 + 0.1413 + 0.1230,  # Class 2: Astronomy + Earth + Physics  
-  0.0175 + 0.1274 + 0.2042   # Class 3: Astronomy + Earth + Physics
-)
-chem_materials_prop <- LCA_best_model$probs$spec_hlavni[,"Astronomy and Planetary Science"]
-+LCA_best_model$probs$spec_hlavni[,"Earth and Environmental Science"]+LCA_best_model$probs$spec_hlavni[,"Physics"]   
-# chem_materials_prop <- c(0.1819 + 0.0293, 0.1254 + 0.0979, 0.1238 + 0.0722)
+# physics_earth_prop <- c(
+#   0.0082 + 0.0393 + 0.0952,  # Class 1: Astronomy + Earth + Physics
+#   0.0050 + 0.1413 + 0.1230,  # Class 2: Astronomy + Earth + Physics  
+#   0.0175 + 0.1274 + 0.2042   # Class 3: Astronomy + Earth + Physics
+# )
+physics_earth_prop <- LCA_best_model$probs$spec_hlavni[,"Astronomy and Planetary Science"]+LCA_best_model$probs$spec_hlavni[,"Earth and Environmental Science"]+LCA_best_model$probs$spec_hlavni[,"Physics"]   
 
+# chem_materials_prop <- c(0.1819 + 0.0293, 0.1254 + 0.0979, 0.1238 + 0.0722)
+chem_materials_prop <- LCA_best_model$probs$spec_hlavni[,"Chemistry"]+LCA_best_model$probs$spec_hlavni[,"Materials Science"]
+  
 # Create comprehensive data frame for bubble plot
 bubble_data_calculated <- data.frame(
   Class = c("Class 1: Elite", "Class 2: Early Career", "Class 3: Senior Exp"),
@@ -2253,7 +2271,7 @@ PCA.vars <- c("obor_dotovany",
 "obor_medializ",
 "obor_verejnos",
 "obor_komplexn",
-"obor_mensi",
+"obor_vetsi",
 "obor_ekzaktnost"
 )
 
