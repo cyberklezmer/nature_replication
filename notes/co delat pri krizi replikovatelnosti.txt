@@ -1,0 +1,11 @@
+krize_rep vysvětlená:
+1) sociodemografií
+2) 
+"frek_nerepre"                   
+"frek_hacking"                  
+"frek_positiv"                   
+"frek_popular"                  
+"frek_modmet"                    
+"frek_oversell"                 
+"frek_zbytecne"                  
+"frek_salam"     
