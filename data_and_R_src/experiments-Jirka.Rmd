@@ -1904,21 +1904,25 @@ obor_konkuren: class 2 is 64.0% in the most competitive category vs
 library(dplyr)
 library(ggplot2)
 
-class_labels <- c("class 1" = "Senior\nResearchers",
-                   "class 2" = "Competitive/\nPublication-Driven",
-                   "class 3" = "Young Career\nResearchers")
+class_labels <- c("class 1" = "Senior Researchers",
+                   "class 2" = "Competitive/Publication-Driven\n Fields",
+                   "class 3" = "Young Career Researchers")
 
 # ---- Pull krize_rep probabilities directly from the model -----------------
 krize_mat <- LCA_best_model$probs$krize_rep
 rownames(krize_mat) <- c("class 1", "class 2", "class 3")
-colnames(krize_mat) <- c("No Crisis", "Low Crisis", "Moderate Crisis", "High Crisis")
+# Czech names:
+# c("Ano, významná krize","Ano, nevýznamná krize","Nevím","Ne, žádná krize není")
+colnames(krize_mat) <- c("High Crisis", "Moderate Crisis", "I don't know", "No Crisis")
+# This was wrong:
+# colnames(krize_mat) <- c("No Crisis", "Low Crisis", "Moderate Crisis", "High Crisis")
 
 crisis_field_data <- as.data.frame(as.table(krize_mat), stringsAsFactors = FALSE)
 names(crisis_field_data) <- c("Class", "Crisis_Level", "Probability")
 
 crisis_field_data <- crisis_field_data %>%
   mutate(Crisis_Level = factor(Crisis_Level,
-                                levels = c("No Crisis", "Low Crisis", "Moderate Crisis", "High Crisis")),
+                                levels = c("High Crisis", "Moderate Crisis", "I don't know", "No Crisis")),
          Crisis_Numeric = as.numeric(Crisis_Level),
          Class_Label = class_labels[Class])
 
@@ -1937,21 +1941,21 @@ p2_stacked <- ggplot(crisis_field_data, aes(x = reorder(Class_Label, Mean_Crisis
                                            y = Probability, 
                                            fill = Crisis_Level)) +
   geom_bar(stat = "identity", width = 0.7) +
-  scale_fill_manual(name = "Crisis Perception",
+  scale_fill_manual(name = "Crisis Perception:",
                     values = c("No Crisis" = "#2E8B57",
-                              "Low Crisis" = "#90EE90", 
+                              "I don't know" = "#90EE90", 
                               "Moderate Crisis" = "#FFD700",
                               "High Crisis" = "#DC143C")) +
-  labs(title = "Reproducibility Crisis Perceptions by Academic Class",
-       subtitle = "Classes ordered from least to most concerned about the reproducibility crisis",
-       x = "Academic Class",
+  labs(title = "Reproducibility Crisis Perceptions by Latent Class",
+       subtitle = "Classes ordered from most to least concerned about the reproducibility crisis",
+       x = "Latent Class",
        y = "Proportion") +
   theme_minimal() +
   theme(plot.title = element_text(size = 14, face = "bold"),
         axis.text.x = element_text(size = 10),
         legend.position = "bottom")
 
-pdf(file="LCA Experimental academics are more concerned about reproducibility crisis.pdf")
+pdf(file="LCA - reproducibility crisis.pdf")
   print(p2_stacked)
 dev.off()
 ```
