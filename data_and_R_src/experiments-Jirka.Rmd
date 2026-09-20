@@ -9,6 +9,13 @@ knitr::opts_chunk$set(echo = TRUE)
 source("functions.R")
 ```
 
+
+```{r message=FALSE, results='hide'}
+knit('prepare-data.Rmd', tangle=TRUE)
+source('prepare-data.R')
+```
+
+
 - čísla otázek jsou uvedena v souboru Objektivita přírodních věd - I. část (MU).pdf v adresáři materials
 - propojení názvů a popisu je v souboru názvy-a-popis.xlsx v adresáři data_and_R_src
 
@@ -157,6 +164,9 @@ complicated.vars <- c(
 # zbylé veličiny jsou kategorické 
 categorical.vars <- setdiff(explanatory.vars,union(likert.vars,union(ordinal.vars,union(boolean.vars,complicated.vars))))
 
+# Combine all predictor variables
+all.predictors <- c(likert.vars, ordinal.vars, boolean.vars, categorical.vars)
+
 # For spec_hlavni - create shorter, cleaner names
 my$spec_hlavni <- factor(my$spec_hlavni,
                          levels = c("Chemistry", "Biology", "Engineering", "Medicine", 
@@ -171,8 +181,6 @@ my$spec_hlavni <- factor(my$spec_hlavni,
 # options(contrasts = c("contr.treatment", "contr.treatment"))
 # This is the default:
 options(contrasts = c("contr.treatment", "contr.poly"))
-
-
 ```
 ```{r}
 library(corrplot)
@@ -479,7 +487,7 @@ pdf(file="correlation-graph-Holms-correction.pdf")
 plot(network, 
      layout = fr_layout,
      vertex.size = 12,
-     vertex.color = ifelse(V(cor_graph)$name == "krize_rep", "gold", "lightsteelblue"),
+     vertex.color = ifelse(V(network)$name == "krize_rep", "gold", "lightsteelblue"),
      vertex.label.cex = 0.6,
      vertex.label.color = "black",
      edge.width = E(network)$weight * 8,  # Scale edge width by correlation strength
@@ -671,8 +679,6 @@ Multinomial Regression using nnet package
 ```{r}
 # learning multinomial regression model
 library(nnet)
-# Combine all predictor variables
-all.predictors <- c(likert.vars, ordinal.vars, boolean.vars, categorical.vars)
 # Create formula using reformulate
 formula <- reformulate(termlabels = all.predictors, response = dependent.var)
 

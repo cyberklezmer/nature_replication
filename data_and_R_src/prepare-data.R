@@ -1,31 +1,8 @@
----
-title: "Data preparation"
-author: "Jirka Vomlel"
-date: "2025-09-06"
-output: html_document
----
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
-
-- čísla otázek jsou uvedena v souboru Objektivita přírodních věd - I. část (MU).pdf v adresáři materials
-- propojení názvů a popisu je v souboru názvy-a-popis.xlsx v adresáři data_and_R_src
-
-Petr Jedlička's email z 25.2.2025
-
-1) Reprodukovatelnost (Názor na krizi) 
-- předpokládáme vliv:
-a) Obor (dle angl. číselníku, který je v obou výzkumech stejný), 
-b) dále Sociodemografické faktory
-c) Akademická kariéra (Ot 41-48), případně i další otázky: č. 50 podíl základního výzkumu u respondenta, pří. Ot: 49 - podíl věd činnosti u respondenta, Ot 50 - podíl zákl/apl výzkumu, které by tam mohly spadat 
-Metoda: MLR, multinomial log. regression?
-
-```{r setup, include=FALSE}
+## ----setup, include=FALSE------------------------------------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE)
-```
 
-```{r}
+
+## ------------------------------------------------------------------------------------------------------------------
 ## Encoding: UTF-8
 library(dplyr)
 library(readxl)
@@ -40,37 +17,23 @@ library(ggrepel)
 library(knitr)
 source("functions.R")
 
-```
 
 
-```{r}
+## ------------------------------------------------------------------------------------------------------------------
 # load("../data_src/dataAll.RData")
 load("../data_and_R_src/dataAll.RData")
 complete = data
 # the same filter as in nature.Rmd
 my = filter(complete, cas_sec >= 600, zakl_vyzkum == "Ano")
 # which gives 878 respondents
-```
 
-Exclude columns that are not appropriate for subsequent analysis
 
-```{r}
+## ------------------------------------------------------------------------------------------------------------------
 vars.rm <- c("poradi", "ID", "datum", "cas_sec")
 my <- my[,!names(my) %in% vars.rm]
-```
 
 
-Slyšel(a)/četl(a) jsem o krizi reprodukovatelnosti jako o vědeckém problému? 
-rep_Ne
-rep_Mainstream
-rep_Casopisy
-rep_Diskuse
-rep_Vlastni
-
-I make one variable with states named according to columns that are not NA.
-There are two inconsisitent replies rep_Ne & rep_Diskuse that are both TRUE at the same time.
-
-```{r}
+## ------------------------------------------------------------------------------------------------------------------
 rep.where.vars <- c("rep_Ne","rep_Mainstream","rep_Casopisy","rep_Diskuse","rep_Vlastni")
 my$rep_type <- apply(my[,rep.where.vars], 1, function(row) {
   non_na_cols <- names(row)[!is.na(row)]
@@ -86,11 +49,9 @@ my$rep_type <- apply(my[,rep.where.vars], 1, function(row) {
 table(my$rep_type)
 my <- my[,!names(my) %in% rep.where.vars]
 
-```
 
-Some variables have very rare states we will join them with some other states
 
-```{r}
+## ------------------------------------------------------------------------------------------------------------------
 library(forcats)
 
 # Create cleaned dataset
@@ -156,20 +117,17 @@ for(var in c("vek", "kar_titul", "pomer_veda", "pomer_zakladni", "obor_tlak")) {
 }
 
 my <- my_clean
-```
 
-The mosaic plots of potentially significant variables directly from data
 
-```{r}
+## ------------------------------------------------------------------------------------------------------------------
 # Save current par settings
 old_par <- par(no.readonly = TRUE)
 # Adjust margins (bottom, left, top, right)
 par(mar = c(2, 2, 4, 2))  # Increase top margin
 dependent.var <- "krize_rep"
-```
 
 
-```{r}
+## ------------------------------------------------------------------------------------------------------------------
 var.names <- c("vek", "pomer_zakladni", "obor_tlak", "obor_dotovany", "kar_citace",
                "spec_hlavni", "kar_titul", "obor_medializ", "obor_rychly",
                "nerep_narust", "nerep_problem", "nerep_chyba", "nerep_veda",
@@ -224,11 +182,9 @@ for (i in 1:length(var.names)){
 
 # Restore original settings
 par(old_par)
-```
 
-Mosaic plot: obor_ekzaktnost vs. spec_hlavni
 
-```{r, echo=FALSE}
+## ----echo=FALSE----------------------------------------------------------------------------------------------------
 
 # Save current par settings
 old_par <- par(no.readonly = TRUE)
@@ -255,4 +211,4 @@ dev.off()
 # par(old_par)
 on.exit(par(old_par))
 
-```
+
