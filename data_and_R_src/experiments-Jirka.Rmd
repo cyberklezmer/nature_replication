@@ -1139,7 +1139,7 @@ print(most_significant[, c("Class", "Predictor", "Coefficient", "P_value", "Sign
 ```
 
 
-The variables imporatance analysis
+The variables importance analysis
 
 ```{r}
 # Run the complete analysis
@@ -1887,167 +1887,53 @@ rownames(sco) <- NULL
 rownames(varo) <- NULL
 ```
 
+Stacked bar chart of krize_rep (reproducibility crisis perception) by latent class, 
+pulled directly from the fitted model (LCA_best_model)
+---- Class interpretation ------------------------------------------------
+kar_praxe: class 1 is 88.8% in the top experience category vs class 3's ~1%
+           -> class 1 = most experienced
+vek:       class 3 is 93.2% in the youngest age category vs class 1's 6.7%
+           -> class 3 = youngest
+obor_konkuren: class 2 is 64.0% in the most competitive category vs
+           ~6-10% for classes 1 and 3 -> class 2 = competitive/publication
+=> class 1 = senior researchers, 
+   class 2 = competitive/publication-driven,
+   class 3 = young career researchers
 
 ```{r}
-# Calculate actual values from your poLCA results for bubble plot
-# LCA_best_model$
-# Assuming your poLCA model is stored as 'mod1' or similar
-
-# 1. EXPERIMENTAL INTENSITY (cinnost_exper) - weighted average for each class
-# LCA_best_model$probs$cinnost_exper has levels 1,2,3,4
-# experimental_intensity <- c(
-#   # Class 1: 0.6680*1 + 0.1808*2 + 0.1210*3 + 0.0302*4
-#   0.6680*1 + 0.1808*2 + 0.1210*3 + 0.0302*4,
-#   
-#   # Class 2: 0.5374*1 + 0.2241*2 + 0.1109*3 + 0.1276*4  
-#   0.5374*1 + 0.2241*2 + 0.1109*3 + 0.1276*4,
-#   
-#   # Class 3: 0.4448*1 + 0.1894*2 + 0.1275*3 + 0.2383*4
-#   0.4448*1 + 0.1894*2 + 0.1275*3 + 0.2383*4
-# )
-experimental_intensity <- LCA_best_model$probs$cinnost_exper %*% 1:4
-
-print("Experimental Intensity by Class:")
-print(paste("Class 1:", round(experimental_intensity[1], 2)))
-print(paste("Class 2:", round(experimental_intensity[2], 2)))
-print(paste("Class 3:", round(experimental_intensity[3], 2)))
-
-# 2. CRISIS PERCEPTION (krize_rep) - weighted average for each class
-# From your output: krize_rep has levels 1,2,3,4
-# crisis_perception <- c(
-#   # Class 1: 0.5111*1 + 0.2997*2 + 0.1181*3 + 0.0711*4
-#   0.5111*1 + 0.2997*2 + 0.1181*3 + 0.0711*4,
-#   
-#   # Class 2: 0.2932*1 + 0.2530*2 + 0.3686*3 + 0.0851*4
-#   0.2932*1 + 0.2530*2 + 0.3686*3 + 0.0851*4,
-#   
-#   # Class 3: 0.2169*1 + 0.2925*2 + 0.2675*3 + 0.2231*4
-#   0.2169*1 + 0.2925*2 + 0.2675*3 + 0.2231*4
-# )
-crisis_perception <- LCA_best_model$probs$krize_rep %*% 1:4
-
-print("\nCrisis Perception by Class:")
-print(paste("Class 1:", round(crisis_perception[1], 2)))
-print(paste("Class 2:", round(crisis_perception[2], 2)))
-print(paste("Class 3:", round(crisis_perception[3], 2)))
-
-# 3. CLASS SIZES (from estimated class population shares)
-# class_sizes <- c(0.2669, 0.473, 0.2601)  # From your output
-class_sizes <- LCA_best_model$P
-total_n <- nrow(my.vars.bn.discrete) # Total observations
-actual_class_sizes <- class_sizes * total_n
-
-print("\nClass Sizes:")
-print(paste("Class 1:", round(actual_class_sizes[1])))
-print(paste("Class 2:", round(actual_class_sizes[2])))
-print(paste("Class 3:", round(actual_class_sizes[3])))
-
-# 4. FIELD DISTRIBUTIONS by class (from spec_hlavni)
-# Create field groupings for cleaner visualization
-# biology_prop <- c(0.5336, 0.3678, 0.2417)  # Biology proportion in each class
-biology_prop <- LCA_best_model$probs$spec_hlavni[,"Biology"]
-
-# physics_earth_prop <- c(
-#   0.0082 + 0.0393 + 0.0952,  # Class 1: Astronomy + Earth + Physics
-#   0.0050 + 0.1413 + 0.1230,  # Class 2: Astronomy + Earth + Physics  
-#   0.0175 + 0.1274 + 0.2042   # Class 3: Astronomy + Earth + Physics
-# )
-physics_earth_prop <- LCA_best_model$probs$spec_hlavni[,"Astronomy and Planetary Science"]+LCA_best_model$probs$spec_hlavni[,"Earth and Environmental Science"]+LCA_best_model$probs$spec_hlavni[,"Physics"]   
-
-# chem_materials_prop <- c(0.1819 + 0.0293, 0.1254 + 0.0979, 0.1238 + 0.0722)
-chem_materials_prop <- LCA_best_model$probs$spec_hlavni[,"Chemistry"]+LCA_best_model$probs$spec_hlavni[,"Materials Science"]
-  
-# Create comprehensive data frame for bubble plot
-bubble_data_calculated <- data.frame(
-  Class = c("Class 1: Elite", "Class 2: Early Career", "Class 3: Senior Exp"),
-  Crisis_Perception = crisis_perception,
-  Experimental_Intensity = experimental_intensity,
-  Class_Size = actual_class_sizes,
-  Biology_Prop = biology_prop,
-  Physics_Earth_Prop = physics_earth_prop,
-  Chem_Materials_Prop = chem_materials_prop
-)
-
-print("\nFinal Data for Bubble Plot:")
-print(bubble_data_calculated)
-
-# 5. Create the actual bubble plot with calculated values
+library(dplyr)
 library(ggplot2)
 
-# Simple version with one bubble per class
-p1 <- ggplot(bubble_data_calculated, aes(x = Experimental_Intensity, 
-                                        y = Crisis_Perception,
-                                        size = Class_Size)) +
-  geom_point(alpha = 0.7, color = "steelblue") +
-  geom_text(aes(label = gsub("Class [0-9]: ", "", Class)), 
-            vjust = -1.5, size = 3.5, show.legend = FALSE) +
-  
-  scale_size_continuous(name = "Class Size", range = c(5, 20)) +
-  
-  labs(title = "Reproducibility Crisis Perception vs Experimental Intensity",
-       subtitle = "Each bubble represents one latent class of academics",
-       x = "Experimental Intensity (1=low, 4=high)",
-       y = "Reproducibility Crisis Concern (1=no crisis, 4=severe crisis)",
-       caption = "Bubble size = number of academics in class") +
-  
-  theme_minimal() +
-  theme(plot.title = element_text(size = 14, face = "bold"),
-        plot.subtitle = element_text(size = 11)) +
-  
-  # Add correlation line
-  geom_smooth(method = "lm", se = FALSE, color = "red", linetype = "dashed", size = 0.8) +
-  
-  # Expand axes slightly for better label visibility  
-  expand_limits(x = c(1, 2.5), y = c(1.5, 2.8))
+class_labels <- c("class 1" = "Senior\nResearchers",
+                   "class 2" = "Competitive/\nPublication-Driven",
+                   "class 3" = "Young Career\nResearchers")
 
-pdf(file="LCA Reproducibility Crisis Perception vs Experimental Intensity.pdf")
-  print(p1)
-dev.off()
+# ---- Pull krize_rep probabilities directly from the model -----------------
+krize_mat <- LCA_best_model$probs$krize_rep
+rownames(krize_mat) <- c("class 1", "class 2", "class 3")
+colnames(krize_mat) <- c("No Crisis", "Low Crisis", "Moderate Crisis", "High Crisis")
 
-# 6. Enhanced version showing field composition
-# Reshape data to show field breakdowns
-library(tidyr)
-library(dplyr)
+crisis_field_data <- as.data.frame(as.table(krize_mat), stringsAsFactors = FALSE)
+names(crisis_field_data) <- c("Class", "Crisis_Level", "Probability")
 
-# Check column names first
-print("Column names in bubble_data_calculated:")
-print(names(bubble_data_calculated))
+crisis_field_data <- crisis_field_data %>%
+  mutate(Crisis_Level = factor(Crisis_Level,
+                                levels = c("No Crisis", "Low Crisis", "Moderate Crisis", "High Crisis")),
+         Crisis_Numeric = as.numeric(Crisis_Level),
+         Class_Label = class_labels[Class])
 
-# Alternative approach - create field data manually to avoid select issues
-field_data <- data.frame(
-  Class = rep(c("Class 1: Elite", "Class 2: Early Career", "Class 3: Senior Exp"), each = 3),
-  Crisis_Perception = rep(crisis_perception, each = 3),
-  Experimental_Intensity = rep(experimental_intensity, each = 3),
-  Class_Size = rep(actual_class_sizes, each = 3),
-  Field = rep(c("Biology", "Physics/Earth", "Chemistry/Materials"), 3),
-  Proportion = c(
-    biology_prop[1], physics_earth_prop[1], chem_materials_prop[1],  # Class 1
-    biology_prop[2], physics_earth_prop[2], chem_materials_prop[2],  # Class 2  
-    biology_prop[3], physics_earth_prop[3], chem_materials_prop[3]   # Class 3
-  )
-) %>%
-  mutate(Field_Size = Class_Size * Proportion) %>%
-  filter(Proportion > 0.05)  # Only show substantial field representations
+# Mean crisis score per class - this is the ONLY thing used for ordering
+class_crisis_mean <- crisis_field_data %>%
+  group_by(Class_Label) %>%
+  summarise(Mean_Crisis = sum(Probability * Crisis_Numeric), .groups = "drop")
 
-# BETTER OPTION 1: Side-by-side stacked bar charts
-crisis_field_data <- data.frame(
-  Class = rep(c("Class 1:\nElite Math", "Class 2:\nEarly Career", "Class 3:\nSenior Exp"), each = 4),
-  Crisis_Level = rep(c("No Crisis", "Low Crisis", "Moderate Crisis", "High Crisis"), 3),
-  Probability = c(
-    # Class 1 probabilities (from krize_rep output)
-    0.51, 0.30, 0.12, 0.07,
-    # Class 2 probabilities  
-    0.29, 0.25, 0.37, 0.09,
-    # Class 3 probabilities
-    0.22, 0.29, 0.27, 0.22
-  ),
-  # Add experimental intensity for positioning
-  Experimental_Intensity = rep(experimental_intensity, each = 4)
-) %>%
-  mutate(Crisis_Level = factor(Crisis_Level, 
-                              levels = c("No Crisis", "Low Crisis", "Moderate Crisis", "High Crisis")))
+crisis_field_data <- crisis_field_data %>%
+  left_join(class_crisis_mean, by = "Class_Label")
 
-p2_stacked <- ggplot(crisis_field_data, aes(x = reorder(Class, Experimental_Intensity), 
+print("Mean crisis score by class (used for ordering):")
+print(class_crisis_mean)
+
+p2_stacked <- ggplot(crisis_field_data, aes(x = reorder(Class_Label, Mean_Crisis), 
                                            y = Probability, 
                                            fill = Crisis_Level)) +
   geom_bar(stat = "identity", width = 0.7) +
@@ -2057,74 +1943,21 @@ p2_stacked <- ggplot(crisis_field_data, aes(x = reorder(Class, Experimental_Inte
                               "Moderate Crisis" = "#FFD700",
                               "High Crisis" = "#DC143C")) +
   labs(title = "Reproducibility Crisis Perceptions by Academic Class",
-       subtitle = "Classes ordered by experimental intensity (left=least, right=most experimental)",
+       subtitle = "Classes ordered from least to most concerned about the reproducibility crisis",
        x = "Academic Class",
-       y = "Proportion",
-       caption = "Clear trend: More experimental → More crisis concern") +
+       y = "Proportion") +
   theme_minimal() +
   theme(plot.title = element_text(size = 14, face = "bold"),
         axis.text.x = element_text(size = 10),
         legend.position = "bottom")
 
-pdf(file = "LCA Reproducibility Crisis Perceptions by Academic Class.pdf")
+pdf(file="LCA Experimental academics are more concerned about reproducibility crisis.pdf")
   print(p2_stacked)
 dev.off()
+```
 
-# BETTER OPTION 2: Faceted field composition plot  
-field_summary <- data.frame(
-  Class = rep(c("Elite Math", "Early Career", "Senior Exp"), 3),
-  Field = rep(c("Biology", "Physics/Earth", "Chemistry/Materials"), each = 3),
-  Proportion = c(biology_prop, physics_earth_prop, chem_materials_prop),
-  Crisis_Perception = rep(crisis_perception, 3),
-  Experimental_Intensity = rep(experimental_intensity, 3)
-) %>%
-  filter(Proportion > 0.1)  # Only show fields with >10% representation
 
-p3_faceted <- ggplot(field_summary, aes(x = Experimental_Intensity, 
-                                       y = Crisis_Perception,
-                                       size = Proportion)) +
-  geom_point(alpha = 0.8, color = "steelblue") +
-  
-  # Use repel to avoid overlapping and keep labels inside plot
-  ggrepel::geom_text_repel(aes(label = Class), 
-                          size = 2.8, 
-                          show.legend = FALSE,
-                          max.overlaps = 20,
-                          box.padding = 0.3,
-                          point.padding = 0.2) +
-  
-  facet_wrap(~ Field, scales = "free") +
-  
-  scale_size_continuous(name = "Field Proportion\nwithin Class", 
-                       range = c(4, 12), 
-                       labels = scales::percent) +
-  
-  labs(title = "Crisis Perception vs Experimental Intensity by Field",
-       subtitle = "Each panel shows one field; bubble size = proportion of class in that field",
-       x = "Experimental Intensity",
-       y = "Crisis Perception") +
-  
-  theme_minimal() +
-  theme(plot.title = element_text(size = 13, face = "bold"),
-        strip.text = element_text(size = 11, face = "bold"),
-        panel.spacing = unit(1, "lines")) +
-  
-  # Expand plot margins to accommodate labels
-  coord_cartesian(clip = "off")
-
-pdf(file="LCA Crisis Perception vs Experimental Intensity by Field.pdf")
-  print(p3_faceted)
-dev.off()
-
-# BEST OPTION 3: Clean correlation plot with annotations
-correlation_data <- data.frame(
-  Class = c("Elite Math", "Early Career", "Senior Exp"),
-  Crisis_Perception = crisis_perception,
-  Experimental_Intensity = experimental_intensity,
-  Class_Size = actual_class_sizes,
-  Top_Field = c("Biology (53%)", "Biology (37%)", "Physics (20%)")
-)
-
+```{r}
 p4_clean <- ggplot(correlation_data, aes(x = Experimental_Intensity, 
                                         y = Crisis_Perception,
                                         size = Class_Size)) +
