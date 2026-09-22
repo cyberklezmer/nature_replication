@@ -11,7 +11,7 @@ source("functions.R")
 
 
 ```{r message=FALSE, results='hide'}
-knit('prepare-data.Rmd', tangle=TRUE)
+knitr::knit("prepare-data.Rmd", tangle = TRUE)
 source('prepare-data.R')
 ```
 
