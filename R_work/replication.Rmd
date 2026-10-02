@@ -1,0 +1,591 @@
+---
+title: "Replication of Baker (2016): Czech survey vs. Nature survey"
+author: "Martin Šmíd (data prep for P. Jedlička)"
+date: "`r format(Sys.time(), '%d. %m. %Y')`"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+    code_folding: hide
+params:
+  time_cutoff_min: 0   # minimum completion time in minutes; 0 = no cutoff (10/12/15 = sensitivity)
+  basic_only: FALSE    # TRUE = keep only respondents doing basic research (Q3)
+  drop_math: TRUE      # drop mathematicians (no Baker counterpart; Petr's instruction)
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+source("common.R", local = TRUE)
+```
+
+Comparison of the Czech survey with Baker (2016). Question numbers follow Petr's memo of 21 Sept 2026.
+
+- **Part 1 – Main results** (for the main text): only answer categories offered in both surveys.
+  "Don't know" is kept where both surveys offered it (Q6, Q16; "I can't remember" in Q18–Q20) and
+  excluded where only the Czech survey did (Q8, Q9); Q18–Q20 are restricted to respondents who do
+  experiments; Q5 uses only the four options present in both surveys.
+- **Part 2 – Detailed results** (supplementary): the same basis, question by question.
+- **Part 3 – Sensitivity analysis**: the same with all answer categories kept.
+
+Field-adjusted Czech results reweight Czech respondents to Baker's field mix (Q50). Tests and Cramér's V
+compare Baker with the unadjusted Czech sample. Both samples are self-selected, so CIs reflect sampling noise only.
+
+Settings for this run: time cutoff = `r params$time_cutoff_min` min,
+basic research only = `r params$basic_only`, mathematicians dropped = `r params$drop_math`.
+Baker N = `r nrow(bk)`.
+
+```{r flow}
+kable(flow, caption = "Czech respondent flow")
+```
+
+```{r defs}
+# ---- Versions: which answers are dropped ----
+MAIN <- "Main: shared categories only"
+ALL  <- "All categories"
+CR <- "I can't remember"; NOX <- "I don't do experiments"
+v_main     <- setNames(list(DK), MAIN)            # "don't know" offered only in the Czech survey (Q8, Q9)
+v_main_kp  <- setNames(list(character(0)), MAIN)  # "don't know" offered in both surveys (Q6, Q16): kept
+v_main_exp <- setNames(list(NOX), MAIN)           # Q18-Q20: non-experimenters (Czech only) dropped
+v_all      <- setNames(list(character(0)), ALL)
+
+# ---- Answer scales and item labels ----
+d <- d %>% mutate(rep_podil = ifelse(rep_podil == DK, DK, paste0(parse_number(rep_podil), "%")))
+lv8    <- c(paste0(seq(0, 100, 10), "%"), DK)
+crisis <- c("Significant crisis", "Slight crisis", "No crisis", DK)
+agree  <- c("Strongly agree", "Agree", "Neither agree nor disagree", "Disagree", "Strongly disagree", DK)
+often  <- c("Always", "Very often", "Sometimes", "Rarely", "Never", DK)
+yn     <- c("Yes", "No", CR, NOX)
+q9 <- c(nerep_problem = "Failure to reproduce is a major problem in my field",
+        nerep_chyba   = "Failure to reproduce most often means the original finding is wrong",
+        nerep_valid   = "Failure to reproduce rarely detracts from the validity of the original finding")
+q16 <- c(fakt_podvod = "Fraud", fakt_karier = "Pressure to publish", fakt_dohled = "Insufficient oversight/mentoring",
+         fakt_recenz = "Insufficient peer review", fakt_selekc = "Selective reporting",
+         fakt_replik = "Not replicated enough in original lab", fakt_statis = "Low statistical power or poor analysis",
+         fakt_odborn = "Mistakes in reproduction efforts", fakt_data = "Raw data not available",
+         fakt_dokume = "Protocols, code or reagent info unavailable", fakt_metody = "Methods need special technical expertise",
+         fakt_variab = "Variability of standard reagents", fakt_design = "Poor experimental design",
+         fakt_smula = "Bad luck")
+q1820 <- c(nerep_jaMuj = "Q18: Failed to reproduce own experiment",
+           nerep_jaCizi = "Q19: Failed to reproduce someone else's experiment",
+           nerep_oniMuj = "Q20: Someone failed to reproduce my results")
+
+# ---- Q5 (multiple choice) ----
+q5 <- c(rep_Ne = "No, never heard of it", rep_Mainstream = "Yes, mainstream media",
+        rep_Casopisy = "Yes, scientific journals", rep_Diskuse = "Yes, conferences",
+        rep_Kolegove = "Yes, colleagues (Baker only)", rep_Jinde = "Yes, elsewhere (Baker only)",
+        rep_Vlastni = "Other, own answer (Czech only)")
+q5_common <- c("rep_Ne", "rep_Mainstream", "rep_Casopisy", "rep_Diskuse")
+cz5 <- cz %>% mutate(field = field(spec_hlavni)) %>% left_join(select(fw, field, w), by = "field") %>%
+  select(w, any_of(names(q5))) %>% filter(if_any(any_of(names(q5)), ~ !is.na(.x))) %>%
+  mutate(across(any_of(names(q5)), ~ !is.na(.x)), Survey = "Czech")
+bk5 <- bk %>% select(any_of(names(q5))) %>% mutate(across(everything(), ~ .x == 1), Survey = "Baker", w = 1)
+long5 <- bind_rows(bk5, cz5) %>% pivot_longer(any_of(names(q5)), names_to = "item", values_to = "ticked") %>%
+  filter(!is.na(ticked))
+long5 <- bind_rows(long5 %>% mutate(wt = 1),
+                   long5 %>% filter(Survey == "Czech", !is.na(w)) %>% mutate(Survey = ADJ, wt = w)) %>%
+  mutate(Survey = factor(Survey, levels = c("Baker", "Czech", ADJ)))
+q5_table <- function(opts) long5 %>% filter(item %in% opts) %>% group_by(Survey, item) %>%
+  summarise(pct = round(100 * sum(wt * ticked) / sum(wt), 1), N = n(), .groups = "drop") %>%
+  mutate(item = factor(q5[item], levels = rev(q5)))
+q5_show <- function(opts, title) {
+  t5 <- q5_table(opts)
+  p <- ggplot(t5, aes(x = pct, y = item, fill = Survey)) +
+    geom_col(position = position_dodge(width = 0.85), width = 0.8) +
+    geom_text(aes(label = pct), position = position_dodge(width = 0.85), hjust = -0.15, size = 2.6) +
+    scale_fill_manual(values = pal) + scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
+    labs(title = title, x = "% of respondents", y = NULL, fill = NULL,
+         caption = paste0("Baker N=", nrow(bk5), ", Czech N=", nrow(cz5),
+                          " (Czech: respondents who ticked at least one option)")) +
+    theme_minimal() + theme(legend.position = "bottom")
+  tab <- t5 %>% select(item, Survey, pct) %>% pivot_wider(names_from = Survey, values_from = pct, names_prefix = "% ")
+  list(plot = p, table = tab)
+}
+
+# ---- Q8 means ----
+wci <- function(x, w = rep(1, length(x))) {
+  m <- sum(w * x) / sum(w); n_eff <- sum(w)^2 / sum(w^2)
+  se <- sqrt(sum(w * (x - m)^2) / sum(w) * n_eff / (n_eff - 1)) / sqrt(n_eff)
+  tibble(N = length(x), mean = m, lo = m - qt(0.975, n_eff - 1) * se, hi = m + qt(0.975, n_eff - 1) * se) }
+q8 <- d %>% filter(!is.na(rep_podil), rep_podil != DK) %>% mutate(pct = parse_number(rep_podil))
+q8_means <- bind_rows(q8 %>% group_by(Survey) %>% reframe(wci(pct)) %>% mutate(Survey = as.character(Survey)),
+                      q8 %>% filter(Survey == "Czech", !is.na(w)) %>% reframe(wci(pct, w)) %>% mutate(Survey = ADJ))
+
+# ---- Cramér's V (bias-corrected, Baker vs unadjusted Czech) ----
+cohen <- function(v) cut(v, c(-Inf, 0.1, 0.3, 0.5, Inf),
+                         labels = c("negligible", "small", "medium", "large"), right = FALSE)
+v_of <- function(survey, value) {
+  t <- table(droplevels(factor(survey)), droplevels(factor(value)))
+  if (min(dim(t)) < 2) return(tibble(V = NA_real_, lo = NA_real_, hi = NA_real_, nB = NA, nC = NA))
+  e <- effectsize::cramers_v(t, adjust = TRUE, ci = 0.95, alternative = "two.sided")
+  tibble(V = e[[1]], lo = e$CI_low, hi = e$CI_high, nB = sum(t["Baker", ]), nC = sum(t["Czech", ]))
+}
+v_var <- function(var, drop) {
+  x <- d %>% filter(Survey %in% c("Baker", "Czech"), !is.na(.data[[var]]), !.data[[var]] %in% drop)
+  v_of(x$Survey, x[[var]])
+}
+# Multi-item questions (Q5, Q9, Q16): all items' answers pooled into one distribution
+# (Survey x item:answer). Respondents then contribute several answers, so the CI is too narrow.
+v_battery <- function(vars, drop) {
+  x <- d %>% filter(Survey %in% c("Baker", "Czech")) %>% select(Survey, all_of(vars)) %>%
+    mutate(id = row_number())
+  nr <- x %>% pivot_longer(all_of(vars), names_to = "item", values_to = "value") %>%
+    filter(!is.na(value), !value %in% drop)
+  v_of(nr$Survey, paste(nr$item, nr$value, sep = ": ")) %>%
+    mutate(nB = n_distinct(nr$id[nr$Survey == "Baker"]), nC = n_distinct(nr$id[nr$Survey == "Czech"]))
+}
+v_q5 <- function(opts) {
+  x <- long5 %>% filter(Survey %in% c("Baker", "Czech"), ticked, item %in% opts)
+  v_of(as.character(x$Survey), x$item) %>% mutate(nB = nrow(bk5), nC = nrow(cz5))
+}
+v_summary <- function(drop_shared, drop_czonly, drop_exp, q5opts) {
+  bind_rows(
+    v_q5(q5opts) %>% mutate(Question = "Q5", Item = "Heard of the crisis, and where (options as one distribution)"),
+    v_var("krize_rep", drop_shared) %>% mutate(Question = "Q6", Item = "Is there a reproducibility crisis?"),
+    v_var("rep_podil", drop_czonly) %>% mutate(Question = "Q8", Item = "Share of published results reproducible"),
+    v_battery(names(q9), drop_czonly) %>% mutate(Question = "Q9", Item = "Attitude statements (3 items as one distribution)"),
+    v_battery(names(q16), drop_shared) %>% mutate(Question = "Q16", Item = "Factors of irreproducibility (14 items as one distribution)"),
+    bind_rows(lapply(names(q1820), function(v) v_var(v, drop_exp) %>%
+      mutate(Question = substr(q1820[[v]], 1, 3), Item = substring(q1820[[v]], 6))))) %>%
+    mutate(Size = cohen(V), Label = paste0(Question, ": ", Item)) %>%
+    arrange(parse_number(Question)) %>% mutate(Label = factor(Label, levels = rev(unique(Label))))
+}
+v_plot <- function(vres, title) {
+  vres <- vres %>% mutate(Lab = paste0(Label, "  [", Size, "]"),
+                          Lab = factor(Lab, levels = paste0(levels(Label), "  [", Size[match(levels(Label), Label)], "]")))
+  ggplot(vres, aes(x = V, y = Lab, colour = Size)) +
+    annotate("rect", xmin = -Inf, xmax = 0.1, ymin = -Inf, ymax = Inf, alpha = 0.10) +
+    geom_vline(xintercept = c(0.1, 0.3, 0.5), linetype = "dotted", linewidth = 0.3) +
+    geom_pointrange(aes(xmin = lo, xmax = hi), size = 0.3) +
+    scale_colour_manual(values = c(negligible = "#2E8B57", small = "#4C72B0", medium = "#DD8452", large = "#C44E52"),
+                        drop = FALSE) +
+    coord_cartesian(xlim = c(0, max(vres$hi, na.rm = TRUE) + 0.05)) +
+    labs(title = title, x = "Cramér's V (bias-corrected), 95% CI", y = NULL, colour = NULL,
+         caption = "Dotted lines: 0.1 / 0.3 / 0.5 (Cohen: small / medium / large). Shaded: negligible.") +
+    theme_minimal() + theme(legend.position = "bottom")
+}
+v_fmt <- function(vres) vres %>% mutate(`V [95% CI]` = sprintf("%.2f [%.2f, %.2f]", V, lo, hi))
+
+# ---- Headline shares (direction of the difference) ----
+share_row <- function(var, hit, drop) {
+  x <- d %>% filter(!is.na(.data[[var]]), !.data[[var]] %in% drop)
+  b <- x %>% filter(Survey == "Baker"); cc <- x %>% filter(Survey == "Czech"); ca <- cc %>% filter(!is.na(w))
+  tibble(Baker = 100 * mean(b[[var]] %in% hit), Czech = 100 * mean(cc[[var]] %in% hit),
+         Adj = 100 * weighted.mean(ca[[var]] %in% hit, ca$w))
+}
+```
+
+# Part 1: Main results
+
+Only answer categories offered in both surveys: "don't know" kept in Q6 and Q16 and "I can't remember"
+in Q18–Q20 (offered in both), excluded in Q8 and Q9 (Czech only); Q18–Q20 experimenters only; Q5 only
+the four options in both surveys. Size of the difference: one
+bias-corrected Cramér's V per question, Baker vs Czech; Cohen's label in brackets (below 0.1 negligible,
+0.1–0.3 small, 0.3–0.5 medium, 0.5+ large). For Q5, Q9 and Q16 all items are pooled into one distribution.
+Tables are in Part 2.
+
+```{r main-v, include=FALSE}
+vmain <- v_summary(character(0), DK, NOX, q5_common)
+```
+
+```{r main-plot, fig.height=4, fig.width=11}
+v_plot(vmain, "Size of the difference, Czech vs Baker")
+```
+
+```{r main-tiles, fig.height=9, fig.width=15}
+# Miniatures of the Part 2 comparisons (Baker vs unadjusted Czech, shared categories only)
+dist <- function(var, drop, lv) d %>% filter(Survey %in% c("Baker", "Czech"), !is.na(.data[[var]]), !.data[[var]] %in% drop) %>%
+  count(Survey, cat = .data[[var]]) %>% group_by(Survey) %>% mutate(pct = 100 * n / sum(n)) %>% ungroup() %>%
+  mutate(cat = factor(cat, levels = lv)) %>% arrange(cat) %>% mutate(cat = as.character(cat))
+item_share <- function(labels, hit, drop) bind_rows(lapply(names(labels), function(v)
+  d %>% filter(Survey %in% c("Baker", "Czech"), !is.na(.data[[v]]), !.data[[v]] %in% drop) %>%
+    group_by(Survey) %>% summarise(pct = 100 * mean(.data[[v]] %in% hit), .groups = "drop") %>%
+    mutate(cat = labels[[v]])))
+q9s <- c(nerep_problem = "Major problem in my field", nerep_chyba = "Means original is wrong",
+         nerep_valid = "Rarely detracts from validity")
+vlab <- function(q) { v <- vmain[vmain$Question == q, ]; sprintf("V = %.2f (%s)", v$V, v$Size) }
+panels <- list(
+  list(q = "Q5",  t = "Q5: Heard of the crisis (% ticking)",
+       x = q5_table(q5_common) %>% filter(Survey != ADJ) %>% transmute(Survey, cat = as.character(item), pct) %>%
+             mutate(cat = factor(cat, levels = q5[q5_common])) %>% arrange(cat) %>% mutate(cat = as.character(cat))),
+  list(q = "Q6",  t = "Q6: Is there a crisis?", x = dist("krize_rep", character(0), crisis)),
+  list(q = "Q8",  t = "Q8: % of results reproducible", x = dist("rep_podil", DK, lv8)),
+  list(q = "Q9",  t = "Q9: Agree (% strongly agree + agree)", x = item_share(q9s, c("Strongly agree", "Agree"), DK)),
+  list(q = "Q16", t = "Q16: Always/very often contributes (%)", x = item_share(q16, c("Always", "Very often"), character(0))),
+  list(q = "Q18", t = "Q18: Failed to reproduce own experiment", x = dist("nerep_jaMuj", NOX, yn)),
+  list(q = "Q19", t = "Q19: Failed to reproduce others' experiment", x = dist("nerep_jaCizi", NOX, yn)),
+  list(q = "Q20", t = "Q20: Someone failed to reproduce mine", x = dist("nerep_oniMuj", NOX, yn)))
+tiles <- bind_rows(lapply(panels, function(p) {
+  x <- p$x; if (p$q == "Q16") x <- x %>% group_by(cat) %>% mutate(o = pct[Survey == "Baker"]) %>% ungroup() %>% arrange(desc(o))
+  x %>% mutate(Panel = paste0(p$t, "\n", vlab(p$q)), key = paste(p$q, cat, sep = "___"),
+               ord = match(cat, unique(x$cat)), q = p$q)
+}))
+tiles <- tiles %>% mutate(Panel = factor(Panel, levels = unique(Panel)),
+                          key = factor(key, levels = rev(unique(key[order(match(q, unique(q)), ord)]))),
+                          Survey = factor(Survey, levels = c("Baker", "Czech")))
+ggplot(tiles, aes(x = pct, y = key, fill = Survey)) +
+  geom_col(position = position_dodge2(width = 0.8, reverse = TRUE, padding = 0.05), width = 0.75) +
+  facet_wrap(~ Panel, nrow = 2, ncol = 4, scales = "free") +
+  scale_y_discrete(labels = function(k) sub("^.*___", "", k)) +
+  scale_fill_manual(values = pal) +
+  labs(x = "% of respondents", y = NULL, fill = NULL,
+       title = "Czech survey vs Baker (2016): shared answer categories only") +
+  theme_minimal(base_size = 10) +
+  theme(legend.position = "bottom", strip.text = element_text(face = "bold", hjust = 0),
+        axis.text.y = element_text(size = 7.5))
+```
+
+```{r main-field, fig.height=8, fig.width=8}
+# ---- Answer spectra by field (Q6, Q18, Q19) ----
+qf <- c(krize_rep = "Q6", nerep_jaMuj = "Q18", nerep_jaCizi = "Q19", nerep_oniMuj = "Q20")
+ans_cols <- c("Significant crisis" = "#B2182B", "Slight crisis" = "#EF8A62", "No crisis" = "#67A9CF",
+              "I don't know" = "#BDBDBD", "Yes" = "#762A83", "No" = "#1B7837",
+              "I can't remember" = "#D9D9D9", "I don't do experiments" = "#737373")
+by_field <- function(drops) bind_rows(lapply(names(qf), function(v)
+  d %>% filter(Survey %in% c("Baker", "Czech"), !is.na(field), !is.na(.data[[v]]), !.data[[v]] %in% drops[[v]]) %>%
+    count(field, Survey, answer = .data[[v]]) %>% group_by(field, Survey) %>%
+    mutate(N = sum(n), pct = 100 * n / N) %>% ungroup() %>% mutate(Q = qf[[v]], var = v)))
+# Fields from "hard" to "soft", fixed a priori (hierarchy of the sciences: Comte; Fanelli 2010), "Other" last
+hard_order <- c("Mathematics", "Astronomy", "Physics", "Chemistry", "Materials Science", "Engineering",
+                "Earth & environment", "Biology", "Medicine", "Other")
+field_order <- function(bf) intersect(hard_order, unique(bf$field))
+field_plot <- function(bf, qs, title) {
+  bf <- bf %>% filter(Q %in% qs)
+  bf <- bf %>% mutate(field = factor(field, levels = field_order(bf)), Q = factor(Q, levels = qs),
+                      Survey = factor(Survey, levels = c("Czech", "Baker")),
+                      answer = factor(answer, levels = names(ans_cols)))
+  ns <- bf %>% distinct(field, Q, Survey, N)
+  ggplot(bf, aes(x = pct, y = Survey, fill = answer)) +
+    geom_col(width = 0.8, orientation = "y", position = position_stack(reverse = TRUE)) +
+    geom_text(data = ns, aes(x = 102, y = Survey, label = paste0("n=", N)), inherit.aes = FALSE, hjust = 0, size = 2.5) +
+    facet_grid(field ~ Q, switch = "y") +
+    scale_fill_manual(values = ans_cols, drop = TRUE, name = NULL) +
+    scale_x_continuous(limits = c(0, 122), breaks = c(0, 50, 100)) +
+    labs(title = title, x = "% of respondents in the field", y = NULL,
+         caption = "Fields ordered from \"hard\" to \"soft\" (hierarchy of the sciences). Baker's \"Other\" includes social and behavioural sciences. Small cells (n < 20) are unreliable.") +
+    theme_minimal(base_size = 10) +
+    theme(panel.grid = element_blank(), strip.placement = "outside",
+          strip.text.y.left = element_text(angle = 0, hjust = 1), strip.text.x = element_text(face = "bold"),
+          axis.text.y = element_text(size = 7.5), legend.position = "bottom")
+}
+# Q18-Q20: field's "yes" share minus the survey's overall "yes" share for the question, 95% CI.
+# diff = (n_rest/N) * (p_field - p_rest), so its variance follows from two independent proportions.
+qy <- c(nerep_jaMuj = "Q18: Failed to reproduce own experiment",
+        nerep_jaCizi = "Q19: Failed to reproduce someone else's experiment",
+        nerep_oniMuj = "Q20: Someone failed to reproduce my results")
+yes_dev <- function(keep) bind_rows(lapply(names(qy), function(v) {
+  x <- d[d$Survey %in% c("Baker", "Czech") & !is.na(d[[v]]) & d[[v]] %in% keep, ]
+  x$yes <- x[[v]] == "Yes"
+  tot <- x %>% group_by(Survey) %>% summarise(Nall = n(), kall = sum(yes), .groups = "drop")
+  x %>% filter(!is.na(field)) %>% group_by(Survey, field) %>% summarise(n = n(), k = sum(yes), .groups = "drop") %>%
+    left_join(tot, by = "Survey") %>%
+    mutate(pf = k / n, nr = Nall - n, pr = (kall - k) / nr, pall = kall / Nall,
+           diff = 100 * (pf - pall), se = 100 * (nr / Nall) * sqrt(pf * (1 - pf) / n + pr * (1 - pr) / nr),
+           lo = diff - 1.96 * se, hi = diff + 1.96 * se, Q = qy[[v]])
+}))
+yes_plot <- function(yd, title, nmin = 20) {
+  yd <- yd %>% filter(n >= nmin) %>%
+    mutate(field = factor(field, levels = intersect(hard_order, unique(field))),
+           Survey = factor(Survey, levels = c("Baker", "Czech")), Q = factor(Q, levels = qy))
+  avg <- yd %>% distinct(Q, Survey, pall) %>% arrange(Survey) %>% group_by(Q) %>%
+    summarise(lab = paste0("Overall yes: ", paste0(Survey, " ", round(100 * pall), "%", collapse = ", ")), .groups = "drop")
+  ggplot(yd, aes(x = field, y = diff, fill = Survey)) +
+    geom_hline(yintercept = 0, linewidth = 0.3) +
+    geom_col(position = position_dodge(width = 0.8), width = 0.75) +
+    geom_errorbar(aes(ymin = lo, ymax = hi), position = position_dodge(width = 0.8), width = 0.25, linewidth = 0.3) +
+    geom_text(data = avg, aes(x = -Inf, y = Inf, label = lab), inherit.aes = FALSE, hjust = -0.02, vjust = 1.3, size = 3) +
+    facet_grid(Q ~ ., labeller = label_wrap_gen(22)) +
+    scale_fill_manual(values = pal) +
+    labs(title = title, x = NULL, y = "'Yes' share minus question average (pp), 95% CI", fill = NULL,
+         caption = paste0("Average = each survey's overall 'yes' share for the question. ",
+                          "Fields ordered from \"hard\" to \"soft\"; cells with n < ", nmin, " omitted.")) +
+    theme_minimal(base_size = 10) +
+    theme(legend.position = "bottom", axis.text.x = element_text(angle = 30, hjust = 1),
+          strip.text.y = element_text(angle = 0, face = "bold"), panel.grid.major.x = element_blank())
+}
+yes_table <- function(yd) yd %>%
+  mutate(field = factor(field, levels = intersect(hard_order, unique(field)))) %>% arrange(Q, field, Survey) %>%
+  transmute(Question = Q, Field = field, Survey, n, `Yes %` = round(100 * pf, 1), `Overall yes %` = round(100 * pall, 1),
+            `Difference, pp [95% CI]` = sprintf("%.1f [%.1f, %.1f]", diff, lo, hi))
+bf_main <- by_field(list(krize_rep = character(0), nerep_jaMuj = NOX, nerep_jaCizi = NOX, nerep_oniMuj = NOX))
+field_plot(bf_main, "Q6", "Q6: Is there a reproducibility crisis? Answers by field (shared categories only)")
+```
+
+Q18–Q20 by field: only "yes" and "no" answers. Each bar is the field's "yes" share minus that survey's
+overall "yes" share for the question (percentage points, 95% CI). The full answer spectra are in Part 3.
+
+```{r main-field-1820, fig.height=8, fig.width=11}
+yd_main <- yes_dev(c("Yes", "No"))
+yes_plot(yd_main, "Q18-Q20 by field: deviation of the 'yes' share from the question average")
+```
+
+
+
+# Part 2: Detailed results (supplementary)
+
+Same basis as Part 1: only answer categories offered in both surveys.
+
+## Summary tables
+
+```{r d-v}
+vmain %>% v_fmt() %>% transmute(Question, Item, `N Baker` = nB, `N Czech` = nC, `V [95% CI]`, Size) %>%
+  kable(caption = "Size of the difference per question (Cramér's V, bias-corrected). For Q5, Q9 and Q16 items are pooled; respondents give several answers, so these CIs are too narrow.")
+```
+
+```{r d-shares}
+t5m <- q5_table(q5_common) %>% select(item, Survey, pct) %>%
+  pivot_wider(names_from = Survey, values_from = pct) %>%
+  transmute(Question = "Q5", Item = as.character(item), Headline = "ticked", Baker, Czech, Adj = .data[[ADJ]])
+hl <- bind_rows(
+  t5m,
+  share_row("krize_rep", "Significant crisis", character(0)) %>%
+    mutate(Question = "Q6", Item = "Is there a reproducibility crisis?", Headline = "significant crisis"),
+  q8_means %>% select(Survey, mean) %>% pivot_wider(names_from = Survey, values_from = mean) %>%
+    transmute(Question = "Q8", Item = "Share of published results reproducible", Headline = "mean %",
+              Baker, Czech, Adj = .data[[ADJ]]),
+  bind_rows(lapply(names(q9), function(v) share_row(v, c("Strongly agree", "Agree"), DK) %>%
+    mutate(Question = "Q9", Item = q9[[v]], Headline = "agree"))),
+  bind_rows(lapply(names(q16), function(v) share_row(v, c("Always", "Very often"), character(0)) %>%
+    mutate(Question = "Q16", Item = q16[[v]], Headline = "always + very often"))),
+  bind_rows(lapply(names(q1820), function(v) share_row(v, "Yes", NOX) %>%
+    mutate(Question = substr(q1820[[v]], 1, 3), Item = substring(q1820[[v]], 6), Headline = "yes"))))
+hl %>% arrange(parse_number(Question)) %>%
+  transmute(Question, Item, Headline, Baker = round(Baker, 1), Czech = round(Czech, 1),
+            `Czech (field-adj.)` = round(Adj, 1)) %>%
+  kable(caption = "Direction of the difference: headline shares in % (Q8: mean estimate in %), shared categories only")
+```
+
+## Sample composition (Q50)
+
+Used for sample comparability, not as a substantive replication finding.
+
+```{r d-q50}
+fl <- c("Biology", "Medicine", "Chemistry", "Physics", "Earth & environment", "Materials Science",
+        "Engineering", "Astronomy", "Mathematics", "Other")
+r <- compare_cat("field", fl, title = "Q50: Main specialization",
+                 versions = setNames(list(character(0)), "Field composition"), adjust = FALSE)
+r$plot + facet_null(); kable(r$table %>% select(-Version))
+```
+
+Weights used for the field-adjusted Czech results (weight = Baker share / Czech share):
+
+```{r d-weights}
+kable(fw %>% mutate(across(c(Baker, Czech), ~ round(100 * .x, 1)), w = round(w, 2)) %>%
+        rename(`Baker %` = Baker, `Czech %` = Czech, Weight = w) %>% arrange(desc(`Baker %`)))
+```
+
+## Q5 – Awareness of the reproducibility crisis
+
+```{r d-q5}
+r <- q5_show(q5_common, "Q5: Have I heard of the reproducibility crisis? (options in both surveys)"); r$plot; kable(r$table)
+```
+
+## Q6 – Is there a reproducibility crisis?
+
+```{r d-q6}
+r <- compare_cat("krize_rep", crisis, versions = v_main_kp, title = "Q6: Is there a reproducibility crisis?"); r$plot; kable(r$table)
+```
+
+## Q8 – Share of published results in my field that are reproducible
+
+```{r d-q8, fig.height=6}
+r <- compare_cat("rep_podil", lv8, versions = v_main, title = "Q8: What share of published results in my field is reproducible?")
+r$plot; kable(r$table)
+kable(q8_means %>% mutate(across(where(is.double), ~ round(.x, 1))), caption = "Mean estimate, overall")
+t.test(pct ~ Survey, data = q8)
+```
+
+```{r d-q8-field, fig.height=5}
+byf <- q8 %>% filter(!is.na(field)) %>% group_by(Survey, field) %>% filter(n() >= 5) %>% reframe(wci(pct))
+ggplot(byf, aes(x = mean, y = factor(field, levels = rev(intersect(hard_order, unique(field)))), colour = Survey)) +
+  geom_pointrange(aes(xmin = lo, xmax = hi), position = position_dodge(width = 0.5)) +
+  scale_colour_manual(values = pal) +
+  labs(title = "Q8 by field: mean estimated reproducibility (95% CI)", x = "%", y = NULL,
+       caption = "Fields with at least 5 respondents.") +
+  theme_minimal() + theme(legend.position = "bottom")
+kable(byf %>% mutate(across(where(is.double), ~ round(.x, 1))) %>% arrange(match(field, hard_order), Survey))
+```
+
+## Q9 – Attitude statements
+
+Baker's "major problem for all fields" has no Czech counterpart. Q9d ("increase during my career")
+is Czech only and is reported in `sample.Rmd`.
+
+```{r d-q9, fig.height=5}
+r <- compare_battery(names(q9), q9, agree, top = c("Strongly agree", "Agree"), versions = v_main,
+                     title = "Q9: Agreement with statements")
+r$plot; kable(r$table, caption = "Share agreeing (strongly agree + agree)")
+```
+
+## Q16 – Factors contributing to irreproducible research
+
+```{r d-q16, fig.height=7}
+r <- compare_battery(names(q16), q16, often, top = c("Always", "Very often"), versions = v_main_kp,
+                     title = "Q16: How much does each factor contribute to irreproducibility?")
+r$plot; kable(r$table, caption = "Share answering always + very often")
+```
+
+## Q18 – Failed to reproduce my own experiment
+
+```{r d-q18}
+r <- compare_cat("nerep_jaMuj", yn, versions = v_main_exp, title = "Q18: Have I failed to reproduce my own experiment?"); r$plot; kable(r$table)
+```
+
+## Q19 – Failed to reproduce someone else's experiment
+
+```{r d-q19}
+r <- compare_cat("nerep_jaCizi", yn, versions = v_main_exp, title = "Q19: Have I failed to reproduce someone else's experiment?"); r$plot; kable(r$table)
+```
+
+## Q20 – Someone failed to reproduce my results
+
+```{r d-q20}
+r <- compare_cat("nerep_oniMuj", yn, versions = v_main_exp, title = "Q20: Has someone failed to reproduce my results?"); r$plot; kable(r$table)
+```
+
+## By field (Q6, Q18, Q19, Q20)
+
+Answer spectra by field in % (Baker / Czech), with Cramér's V (bias-corrected) per field and question.
+Same basis as Part 1. Small cells (n < 20) are unreliable.
+
+```{r d-field}
+abbr <- c("Significant crisis" = "Sig", "Slight crisis" = "Sli", "No crisis" = "No", "I don't know" = "DK",
+          "Yes" = "Yes", "No" = "No", "I can't remember" = "CR", "I don't do experiments" = "NoExp")
+field_table <- function(bf, drops) {
+  spec <- bf %>% mutate(answer = factor(answer, levels = names(ans_cols))) %>% arrange(answer) %>%
+    group_by(Q, var, field, Survey, N) %>%
+    summarise(dist = paste0(abbr[as.character(answer)], " ", round(pct), collapse = ", "), .groups = "drop") %>%
+    pivot_wider(names_from = Survey, values_from = c(N, dist))
+  keys <- spec %>% distinct(Q, var, field)
+  vv <- bind_rows(lapply(seq_len(nrow(keys)), function(i) {
+    vr <- keys$var[i]; fl <- keys$field[i]
+    x <- d[d$Survey %in% c("Baker", "Czech") & d$field %in% fl & !is.na(d[[vr]]) & !d[[vr]] %in% drops[[vr]], ]
+    v_of(x$Survey, x[[vr]]) %>% mutate(Q = keys$Q[i], field = fl)
+  })) %>% select(Q, field, V, lo, hi)
+  spec %>% left_join(vv, by = c("Q", "field")) %>%
+    mutate(field = factor(field, levels = field_order(bf))) %>% arrange(parse_number(Q), field) %>%
+    transmute(Question = Q, Field = field, `N Baker` = N_Baker, `N Czech` = N_Czech,
+              `Baker %` = dist_Baker, `Czech %` = dist_Czech,
+              `V [95% CI]` = sprintf("%.2f [%.2f, %.2f]", V, lo, hi), Size = cohen(V))
+}
+field_table(bf_main, list(krize_rep = character(0), nerep_jaMuj = NOX, nerep_jaCizi = NOX, nerep_oniMuj = NOX)) %>%
+  kable(caption = "Sig/Sli/No/DK = significant/slight/no crisis/don't know; CR = can't remember; NoExp = don't do experiments.")
+```
+
+Q18–Q20, "yes" and "no" only: field's "yes" share and its deviation from the survey's overall share
+(as in the Part 1 figure; all cells shown).
+
+```{r d-field-yes}
+yes_table(yd_main) %>% kable()
+```
+
+# Part 3: Sensitivity analysis – all answer categories
+
+All categories kept, including those offered in one survey only: "don't know" in Q8 and Q9,
+"I don't do experiments" in Q18–Q20, and the one-survey Q5 options. Categories present in only one survey raise V by construction.
+
+## Size of the differences
+
+```{r s-table}
+vall <- v_summary(character(0), character(0), character(0), names(q5))
+vall %>% v_fmt() %>% left_join(v_fmt(vmain) %>% select(Question, Main = `V [95% CI]`, `Size, main` = Size), by = "Question") %>%
+  transmute(Question, Item, `N Baker` = nB, `N Czech` = nC, `V [95% CI], all categories` = `V [95% CI]`,
+            `Size, all` = Size, `V [95% CI], main` = Main, `Size, main`) %>% kable()
+```
+
+```{r s-plot, fig.height=4, fig.width=11}
+v_plot(vall, "Size of the difference, Czech vs Baker (all categories)")
+```
+
+## Q5 – Awareness (all options)
+
+```{r s-q5}
+r <- q5_show(names(q5), "Q5: Have I heard of the reproducibility crisis? (all options)"); r$plot; kable(r$table)
+```
+
+## Q6 – Is there a reproducibility crisis?
+
+```{r s-q6}
+r <- compare_cat("krize_rep", crisis, versions = v_all, title = "Q6: Is there a reproducibility crisis?"); r$plot; kable(r$table)
+```
+
+## Q8 – Share of published results in my field that are reproducible
+
+Baker had no "don't know" option. Means (Part 2) always exclude "don't know".
+
+```{r s-q8, fig.height=6}
+r <- compare_cat("rep_podil", lv8, versions = v_all, title = "Q8: What share of published results in my field is reproducible?"); r$plot; kable(r$table)
+```
+
+## Q9 – Attitude statements
+
+Baker had no "don't know" option.
+
+```{r s-q9, fig.height=5}
+r <- compare_battery(names(q9), q9, agree, top = c("Strongly agree", "Agree"), versions = v_all,
+                     title = "Q9: Agreement with statements")
+r$plot; kable(r$table, caption = "Share agreeing (strongly agree + agree)")
+```
+
+## Q16 – Factors contributing to irreproducible research
+
+```{r s-q16, fig.height=7}
+r <- compare_battery(names(q16), q16, often, top = c("Always", "Very often"), versions = v_all,
+                     title = "Q16: How much does each factor contribute to irreproducibility?")
+r$plot; kable(r$table, caption = "Share answering always + very often")
+```
+
+## Q18 – Failed to reproduce my own experiment
+
+```{r s-q18}
+r <- compare_cat("nerep_jaMuj", yn, versions = v_all, title = "Q18: Have I failed to reproduce my own experiment?"); r$plot; kable(r$table)
+```
+
+## Q19 – Failed to reproduce someone else's experiment
+
+```{r s-q19}
+r <- compare_cat("nerep_jaCizi", yn, versions = v_all, title = "Q19: Have I failed to reproduce someone else's experiment?"); r$plot; kable(r$table)
+```
+
+## Q20 – Someone failed to reproduce my results
+
+```{r s-q20}
+r <- compare_cat("nerep_oniMuj", yn, versions = v_all, title = "Q20: Has someone failed to reproduce my results?"); r$plot; kable(r$table)
+```
+
+## By field (Q6, Q18, Q19, Q20), all categories
+
+```{r s-field, fig.height=8, fig.width=8}
+none <- list(krize_rep = character(0), nerep_jaMuj = character(0), nerep_jaCizi = character(0), nerep_oniMuj = character(0))
+bf_all <- by_field(none)
+field_plot(bf_all, "Q6", "Q6 by field (all categories)")
+```
+
+```{r s-field-1820, fig.height=10, fig.width=12}
+field_plot(bf_all, c("Q18", "Q19", "Q20"), "Q18–Q20 by field (all categories)")
+field_table(bf_all, none) %>% kable()
+```
+
+Q18–Q20 deviations with the "yes" share taken over all answers ("I can't remember" and "I don't do experiments" included):
+
+```{r s-field-yes, fig.height=8, fig.width=11}
+yd_all <- yes_dev(c("Yes", "No", CR, NOX))
+yes_plot(yd_all, "Q18-Q20 by field: deviation of the 'yes' share (all categories)")
+yes_table(yd_all) %>% kable()
+```
+
+# Appendix: checks against the Baker reference values
+
+```{r checks}
+tibble(
+  Check = c("Significant crisis", "Slight crisis", "No crisis", "Don't know", "Mean Q8 (%)",
+            "Failed to reproduce own", "Failed to reproduce others'"),
+  Expected = c(52.0, 37.6, 3.0, 7.4, 58.18, 55.6, 72.1),
+  Computed = c(100 * mean(bk$krize_rep == "There is a significant crisis of reproducibility"),
+               100 * mean(bk$krize_rep == "There is a slight crisis of reproducibility"),
+               100 * mean(bk$krize_rep == "There is no crisis of reproducibility"),
+               100 * mean(bk$krize_rep == "I don't know"),
+               mean(parse_number(bk$rep_podil)),
+               100 * mean(bk$nerep_jaMuj == "Yes"), 100 * mean(bk$nerep_jaCizi == "Yes"))) %>%
+  mutate(Computed = round(Computed, 2)) %>% kable()
+```
