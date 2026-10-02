@@ -14,7 +14,8 @@ Task: P. Jedlička, memo of 21 Sept 2026 ("Data a komparace – Martin").
    answers, field weights and helper functions.
 3. **`sample.Rmd`** → `sample.html` – Czech-only description: Q1–Q3, Q38–Q49, and Q9d (no Baker counterpart).
 4. **`replication.Rmd`** → `replication.html` – comparison with Baker:
-   - **Part 1, main results:** Cramér's V per question, miniature comparisons, Q6 and Q18–Q20 by field.
+   - **Part 1, main results:** Cramér's V per question, miniature comparisons, Q6 by field, and Q18–Q20
+     'yes' share by field with Kruskal–Wallis tests across fields (per survey).
      Only answer categories offered in both surveys ("don't know" kept in Q6/Q16, dropped in Q8/Q9;
      Q18–Q20 without non-experimenters).
    - **Part 2, detailed results (supplementary):** each question in full, field-adjusted Czech results,
@@ -23,6 +24,8 @@ Task: P. Jedlička, memo of 21 Sept 2026 ("Data a komparace – Martin").
    - **Appendix:** Baker reference values (must match the published figures).
 
 Question numbers follow Petr's memo. Both HTML reports are self-contained.
+
+Packages: dplyr, tidyr, readxl, readr, forcats, stringr, ggplot2, knitr, rmarkdown, effectsize.
 
 ## Switches (YAML `params` in both Rmds)
 
