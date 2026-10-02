@@ -57,11 +57,14 @@ Data byla pipravená pomocí skriptu `preprocess.Rmd`, z něj si lze vybrat dva 
 load("dataAll.RData")
 complete = data
 
-load("dataProcessed.RData")
-selected = data
+# MŠ (2026-10-02): dataProcessed.RData se už nevytváří (viz preprocess.Rmd); srovnání jen pokud soubor existuje.
+if (file.exists("dataProcessed.RData")) {
+  load("dataProcessed.RData")
+  selected = data
 
-ncol(complete) == ncol(selected)
-ncol(complete) ; ncol(selected)
+  print(ncol(complete) == ncol(selected))
+  print(ncol(complete)); print(ncol(selected))
+}
 ```
 
 Fooo-hooo! Tak z připravených dat vypadlo skoro 100 proměnných!!! Jasně, už si to vybavuju! Celé bloky na faktory neobjektivity šly pryč, protože to nebylo primární v dosavatních textech a zprávách. Tak asi začnu tím, že se kouknu, co v Nature dělali a jestli to v obou souborech.   
@@ -192,7 +195,11 @@ Baker = read_xlsx("../data_and_R_src/dataNature.xlsx", skip = 1) %>%
               'fakt_replik', 'fakt_statis', 'fakt_odborn', 'fakt_data', 'fakt_dokume',
               'fakt_metody', 'fakt_variab', 'fakt_design', 'fakt_smula', 
               "nerep_oniMuj", "educ",
-              "nerep_problem", "nerep_problemAll", "nerep_chyba", "nerep_neobj",   
+              "nerep_problem", "nerep_problemAll", "nerep_chyba", "nerep_valid",   
+              # MŠ (2026-10-02): Baker sl. 51 ("failure to reproduce rarely detracts from the validity
+              #   of the original finding") odpovídá české otázce 9 "...jen málokdy ubírá na validitě
+              #   originálního zjištění" = nerep_valid. Dříve chybně mapováno na nerep_neobj
+              #   ("Nereprodukovatelné výsledky ubírají vědě na objektivitě"), což je jiný výrok.
                "continent", "cntr.1", "cntr.2", "cntr.3", "cntr.4", "cntr.5", "cntr.6"
               )) %>% 
   mutate(
@@ -1255,8 +1262,8 @@ dfs = df %>% select(Author, starts_with("nerep_"), -c(nerep_zeme, nerep_jaMuj:ne
         name, problem = "I think that the failure to reproduce scientific studies is a major problem in my field.",
         problemAll = "I think that the failure to reproduce scientific studies is a major problem for all fields.",
         chyba = "I think that a failure to reproduce a result most often means that the original finding is wrong.",
-        valid = "Nereproducibility detracts the validity of the original finding.",
-        neobj = "I think that a failure to reproduce rarely detracts from the validity of the original finding.",
+        valid = "I think that a failure to reproduce rarely detracts from the validity of the original finding.",
+        neobj = "Irreproducible results detract from the objectivity of science.",
         veda = "Also irreproducible results are the part of the science.",
         narust = "The fraction of irreproducibile findings has increased during my carrier."
         ),
@@ -1316,8 +1323,8 @@ dfsx = df %>% select(Author, starts_with("nerep_"), -c(nerep_zeme, nerep_jaMuj:n
         name, problem = "I think that the failure to reproduce scientific studies is a major problem in my field.",
         problemAll = "I think that the failure to reproduce scientific studies is a major problem for all fields.",
         chyba = "I think that a failure to reproduce a result most often means that the original finding is wrong.",
-        valid = "Nereproducibility detracts the validity of the original finding.",
-        neobj = "I think that a failure to reproduce rarely detracts from the validity of the original finding.",
+        valid = "I think that a failure to reproduce rarely detracts from the validity of the original finding.",
+        neobj = "Irreproducible results detract from the objectivity of science.",
         veda = "Also irreproducible results are the part of the science.",
         narust = "The fraction of irreproducibile findings has increased during my carrier."
         ),

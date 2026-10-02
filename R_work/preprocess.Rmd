@@ -241,6 +241,9 @@ Proti čemu stojíme víme z `glipse(all)` a `glimpse(allg)`, teď se postupně 
 library(lubridate)
 
 # Vyčištění datumu a odmazání případů před 2019-04-11 a zbytečných proměnných
+# MŠ (2026-10-02): Datový filtr odstraní právě 1 respondenta (AV, vyplněno 2019-04-08,
+#   tři dny před všemi ostatními - nejspíš testovací vyplnění). Proto N = 1021 místo 1022.
+#   Výběr sloupců zároveň zahazuje sl. 5 (QS parametry) a sl. 7 (Q1 - vlastní odpověď).
 all$datum = as.Date(all$datum) 
 all = all[all$datum >= as.Date("2019-04-11"), c(1:4, 6, 8:163)]
 data = all
@@ -319,7 +322,10 @@ data = all %>%
 # Výsledek:
 glimpse(data)
 
-save(data, file = "dataProcessed.RData")
+# MŠ (2026-10-02): Uložení do dataProcessed.RData odstraněno. Tato verze dat byla připravena
+#   pro článek o objektivitě a nehodí se pro srovnání s Baker ("Nevím" -> NA, nezaškrtnutá
+#   políčka -> "Ne", Astronomy a Engineering sloučeny do Other). Vyčištěná data zůstávají
+#   jen v paměti pro analýzy níže v tomto skriptu. Pro srovnání s Baker se používá dataAll.RData.
 ```
 
 Tak a je to vyčištěné! Resp. vše co zatím Petr potřebuje.  
