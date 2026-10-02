@@ -1,0 +1,153 @@
+---
+title: "Czech survey: questions not compared with Baker"
+author: "Martin Šmíd (data prep for P. Jedlička)"
+date: "`r format(Sys.time(), '%d. %m. %Y')`"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+    code_folding: hide
+params:
+  time_cutoff_min: 0   # minimum completion time in minutes; 0 = no cutoff (10/12/15 = sensitivity)
+  basic_only: FALSE    # TRUE = keep only respondents doing basic research (Q3)
+  drop_math: TRUE      # drop mathematicians (no Baker counterpart; Petr's instruction)
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+source("common.R", local = TRUE)
+```
+
+Czech-only descriptives: the sample description (Petr's Q1–Q3, Q38–Q49) and items with no Baker counterpart.
+
+Settings for this run: time cutoff = `r params$time_cutoff_min` min,
+basic research only = `r params$basic_only`, mathematicians dropped = `r params$drop_math`.
+Data preparation is shared with the other report via `common.R`.
+
+```{r flow}
+kable(flow, caption = "Czech respondent flow")
+```
+
+# Sample description (Czech survey)
+
+## Q1 – Main research setting
+
+```{r q1}
+r <- describe("misto_vyzkumu", "Q1: Where I do most of my research", lump = TRUE); r$plot; kable(r$table)
+```
+
+## Q2 – Academy disciplinary division
+
+```{r q2}
+cz <- cz %>% mutate(obor2 = str_remove(obor, "^Sekce ") %>% str_to_sentence() %>%
+  recode("Aplikované fyziky" = "Aplikovaná fyzika", "Biologických a lékařských věd" = "Biologické a lékařské vědy",
+         "Biologicko-ekologických věd" = "Biologicko-ekologické vědy", "Chemických věd" = "Chemické vědy",
+         "Matematiky, fyziky a informatiky" = "Matematika, fyzika a informatika", "Věd o zemi" = "Vědy o zemi"))
+r <- describe("obor2", "Q2: Disciplinary division (AV sections and university equivalents merged)"); r$plot; kable(r$table)
+```
+
+## Q3 – Currently conducting basic research
+
+```{r q3}
+r <- describe("zakl_vyzkum", "Q3: Do I currently conduct basic research?"); r$plot; kable(r$table)
+```
+
+## Q38 – Gender
+
+```{r q38}
+r <- describe("gender", "Q38: Gender"); r$plot; kable(r$table)
+```
+
+## Q39 – Age group
+
+```{r q39}
+r <- describe("vek", "Q39: Age group"); r$plot; kable(r$table)
+```
+
+## Q40 – Years working in research
+
+```{r q40}
+r <- describe("kar_praxe", "Q40: Years in research"); r$plot; kable(r$table)
+```
+
+## Q41 – Highest academic qualification
+
+```{r q41}
+r <- describe("kar_titul", "Q41: Highest academic qualification"); r$plot; kable(r$table)
+```
+
+## Q42 – Approximate citation count
+
+```{r q42}
+r <- describe("kar_citace", "Q42: Citation count (estimate)"); r$plot; kable(r$table)
+```
+
+## Q43 – Publication in a top journal
+
+```{r q43}
+r <- describe("kar_nejlepsi", "Q43: Published in a top disciplinary or major general journal"); r$plot; kable(r$table)
+```
+
+## Q44 – Employment grade
+
+Each institution used its own classification, so the grades are shown per institution and are not harmonised (open issue).
+
+```{r q44}
+cz %>% mutate(kar_kategorie = replace_na(kar_kategorie, "(no answer)")) %>%
+  count(instituce, kar_kategorie) %>% group_by(instituce) %>%
+  mutate(pct = round(100 * n / sum(n), 1)) %>% ungroup() %>% arrange(instituce, kar_kategorie) %>% kable()
+```
+
+## Q45 – Share of basic versus applied research
+
+```{r q45}
+x <- cz %>% transmute(value = pomer_zakladni, num = parse_number(as.character(pomer_zakladni)))
+r <- describe("pomer_zakladni", "Q45: Share of basic research in my work"); r$plot; kable(r$table)
+cat("Mean share of basic research (excluding 'Nevím'):", round(mean(x$num, na.rm = TRUE), 1), "%\n")
+```
+
+## Q46a–i – Characteristics of the field
+
+```{r q46}
+q46 <- c(obor_dotovany = "a: Receives substantial funding", obor_priliv = "b: Rapid influx of researchers",
+         obor_tlak = "c: Exceptional pressure for results", obor_medializ = "d: Frequent media coverage",
+         obor_komplexn = "e: Highly complex phenomena", obor_konkuren = "f: Strong competition",
+         obor_publikac = "g: Rapid publication growth", obor_rychly = "h: Knowledge outdated quickly",
+         obor_verejnos = "i: Strong influence of public opinion")
+r <- describe_battery(names(q46), "Q46: I work in a field which ...",
+                      levels = c("Rozhodně ano", "Spíše ano", "Spíše ne", "Rozhodně ne", "Nevím"))
+r$plot + scale_y_discrete(labels = q46); kable(r$table %>% mutate(item = q46[item]))
+```
+
+## Q47 – Small specialization (< ~1,000 researchers)
+
+```{r q47}
+r <- describe("obor_mensi", "Q47: My specialization is 'small' (under ~1,000 researchers worldwide)"); r$plot; kable(r$table)
+```
+
+## Q48 – Ranked research activities
+
+```{r q48}
+q48 <- c(cinnost_matem = "Mathematics", cinnost_model = "Modelling", cinnost_teori = "Theory development",
+         cinnost_exper = "Experiments", cinnost_kateg = "Description and categorisation",
+         cinnost_vyvoj = "Development of methods/tools")
+r <- describe_battery(names(q48), "Q48: My most frequent activity (rank 1-3)",
+                      levels = c("1. místo", "2. místo", "3. místo", "Tuto činnost nedělám"))
+r$plot + scale_y_discrete(labels = q48); kable(r$table %>% mutate(item = q48[item]))
+```
+
+## Q49 – Field described as harder or softer
+
+```{r q49}
+r <- describe("obor_ekzaktnost", "Q49: Within the natural sciences, I consider my field"); r$plot; kable(r$table)
+```
+
+# Items with no Baker counterpart
+
+## Q9d – Irreproducible results have increased during my career
+
+```{r q9d}
+r <- describe("nerep_narust", "Q9d (Czech only): Irreproducible results have increased during my career"); r$plot; kable(r$table)
+```
+
