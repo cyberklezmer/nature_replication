@@ -116,6 +116,7 @@ explanatory.vars2 <- c(
   "kar_citace",  #42
   "kar_nejlepsi", #43
   "kar_kategorie", #44
+  "pomer_veda", #Q45 is this
   "pomer_zakladni", #Q46 (not Q45)
   "obor_dotovany",
   "obor_konkuren",
@@ -180,15 +181,40 @@ explanatory.vars <- c(
 "obor_ekzaktnost")
 ```
 
+These are variables that were added
+
 ```{r}
-setdiff(explanatory.vars,explanatory.vars2)
+setdiff(explanatory.vars2,explanatory.vars)
 ```
+
+We have to go carefully trough all variables and decided what type they are and how to handle their states
 
 ```{r}
 # Když máme "spec_hlavni" (10 kategorií) asi už nechceme "obor" (12 kategorií, navíc podivných) 
 # Jak se liší Aplikovaná fyzika od Sekce aplikované fyziky? Třeba spojit do jedné.
 # Podobně u ostatních - nakonec vede na 6 oborů (sekcí)
 other.vars <- c("obor")
+
+# joining all states different from rep_Ne to one state called rep_Ano
+my$rep_type <- factor(
+  ifelse(my_clean$rep_type == "rep_Ne", "rep_Ne", "rep_Ano"),
+  levels = c("rep_Ne", "rep_Ano")
+)
+# table(my_clean$rep_type)
+
+library(dplyr)
+library(forcats)
+my <- my %>%
+  mutate(nerep_narust = fct_collapse(nerep_narust,
+                                     Neutrální = c("Ani souhlasím/ani nesouhlasím", "Nevím")) %>%
+           factor(levels = c("Rozhodně nesouhlasím", "Spíše nesouhlasím", "Neutrální",
+                             "Spíše souhlasím", "Rozhodně souhlasím"),
+                  ordered = TRUE))
+# table(my$nerep_narust)
+
+
+
+
 
 # Nyní specifikujeme, které vysvětlující veličiny explanatory.vars se mohou chápat pomocí Likertovy škály.
 # Veličiny mají 5 odpovědí, ale Exaktnost má pouze 3 odpovědi.
