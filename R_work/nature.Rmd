@@ -57,11 +57,14 @@ Data byla pipravená pomocí skriptu `preprocess.Rmd`, z něj si lze vybrat dva 
 load("dataAll.RData")
 complete = data
 
-load("dataProcessed.RData")
-selected = data
+# MŠ (2026-10-02): dataProcessed.RData se už nevytváří (viz preprocess.Rmd); srovnání jen pokud soubor existuje.
+if (file.exists("dataProcessed.RData")) {
+  load("dataProcessed.RData")
+  selected = data
 
-ncol(complete) == ncol(selected)
-ncol(complete) ; ncol(selected)
+  print(ncol(complete) == ncol(selected))
+  print(ncol(complete)); print(ncol(selected))
+}
 ```
 
 Fooo-hooo! Tak z připravených dat vypadlo skoro 100 proměnných!!! Jasně, už si to vybavuju! Celé bloky na faktory neobjektivity šly pryč, protože to nebylo primární v dosavatních textech a zprávách. Tak asi začnu tím, že se kouknu, co v Nature dělali a jestli to v obou souborech.   
