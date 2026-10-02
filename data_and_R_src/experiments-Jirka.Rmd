@@ -38,7 +38,108 @@ Variables classification into following groups:
   - Boolean
   - categorical
   - complicated (will be ignored)
-  - other variables (will be ignored)
+  - other variables 
+  
+# Petr Jedlička, email z 22.9.2026
+Q 6. 6. Existuje podle mého názoru krize reprodukovatelnosti? 
+Q 8. 8. Jaký podíl publikovaných výsledků v mém oboru je reprodukovatelný? (Uveďte svůj nejlepší ODHAD)
+--
+ZNALOST  
+5. 5. Slyšel(a)/četl(a) jsem o krizi reprodukovatelnosti jako o vědeckém problému?
+REPRODUKOVATELNOST 
+Q -9. 9. Do jaké míry souhlasím s následujícími tvrzeními?
+9d  - Během mé kariéry došlo k nárůstu podílu nereprodukovatelných výsledků
+9f - Nereprodukovatelnost vědeckých studií je závažným problémem v mém oboru
+--
+Q 16. 16. Do jaké míry podle mě přispívají následující faktory k nereprodukovatelnosti výsledků? – CELA BATERIE
+---
+Q 18. 18. Pokoušel jsem se někdy NEÚSPĚŠNĚ zopakovat svůj experiment?
+Q 19. 19. Pokoušel jsem se někdy neúspěšně zopakovat experiment někoho jiného?
+Q 20. 20. Stalo se mi někdy, že někdo nemohl reprodukovat nejméně jeden výsledek mých vlastních experimentů
+---
+OBJEKTIVITA
+Q 24. 23. Jak často se ve svém oboru setkávám s následujícími jevy? – CELA BATERIE
+MOJE VĚDECKÁ KARIÉRA (SOCIODEMOGRAFIE + KARIERA)
+41. 38. Jsem: Žena Muž Ostatní
+42. 39. Můj věk je:
+43. 40. Kolik let pracuji ve výzkumu? (Od prvního zaměstnání ve vědecké instituci s odečtením přerušení)
+44. 41. Jaká je moje nejvyšší dosažená akademická hodnost (nebo ekvivalent)?
+45. 42. Počet citací? (Odhad)
+46. 43. Publikoval jsem (i jako spoluautor) v nejlepším oborovém časopisu, případně v časopisech typu Nature, Science, Cell?
+47. 44. Do jaké kategorie dle klasifikace akademie věd patřím?
+---
+MŮJ OBOR – (FIELD CHARACTERISTICS)
+49. 45. Jaký je v mé práci podíl základního výzkumu (vůči aplikovanému)? (Uveďte svůj odhad)
+50. 46. Pracuji v oboru: (CELA BATERIE) 
+51. 47. Pracuji v oboru (specializaci), který je „menší“, tzn. cca do 1000 vědců celosvětově (tedy těch, kteří řeší podobné výzkumné otázky jako já)?
+52. 48. Moje nejčastější činnost je (další činnosti případně uveďte na 2. a 3. místě):  - SCIENTIFIC ACTIVITY
+53. 49. V rámci přírodních věd, považuji svůj obor za:
+55. 50. Jaká je moje hlavní specializace (oblast výzkumu)? (Anglicky) (OBORY – bez matematiků)
+
+```{r}
+dependent.var <- "krize_rep"
+dependent.var2 <- "rep_podil" #Q8
+explanatory.vars2 <- c(
+  "rep_type", #Q5
+  "nerep_narust", #Q9
+  "nerep_problem", #Q9
+  "fakt_podvod", # Q16                    
+  "fakt_karier",
+  "fakt_dohled",                   
+  "fakt_recenz",                   
+  "fakt_selekc",                  
+  "fakt_replik",
+  "fakt_statis",                   
+  "fakt_odborn",
+  "fakt_data",                    
+  "fakt_dokume",
+  "fakt_metody",                  
+  "fakt_variab",
+  "fakt_design",
+  "fakt_smula",
+  "fakt_dalsi", #Q16
+  "nerep_jaMuj", #Q18
+  "nerep_jaCizi", #Q19
+  "nerep_oniMuj", #Q20
+  "frek_nerepre", #Q23
+  "frek_hacking",
+  "frek_positiv",
+  "frek_popular",
+  "frek_modmet",
+  "frek_oversell",
+  "frek_zbytecne",
+  "frek_salam", #Q23
+  "gender", #38
+  "vek", #39
+  "kar_praxe", #40
+  "kar_titul", #41
+  "kar_citace",  #42
+  "kar_nejlepsi", #43
+  "kar_kategorie", #44
+  "pomer_zakladni", #Q46 (not Q45)
+  "obor_dotovany",
+  "obor_konkuren",
+  "obor_tlak",
+  "obor_rychly",
+  "obor_priliv",
+  "obor_publikac",
+  "obor_medializ",
+  "obor_verejnos",
+  "obor_komplexn",
+  "obor_mensi", # Q48
+  "cinnost_matem", #Q49
+  "cinnost_model",
+  "cinnost_teori",
+  "cinnost_exper",
+  "cinnost_kateg",
+  "cinnost_vyvoj", #Q49
+  "obor_ekzaktnost", #Q50
+  "spec_hlavni"
+  )
+# head(my_clean[,explanatory.vars2])
+```
+
+
 
 ```{r}
 my <- my_clean
@@ -77,7 +178,13 @@ explanatory.vars <- c(
 "cinnost_kateg",
 "cinnost_vyvoj",
 "obor_ekzaktnost")
+```
 
+```{r}
+setdiff(explanatory.vars,explanatory.vars2)
+```
+
+```{r}
 # Když máme "spec_hlavni" (10 kategorií) asi už nechceme "obor" (12 kategorií, navíc podivných) 
 # Jak se liší Aplikovaná fyzika od Sekce aplikované fyziky? Třeba spojit do jedné.
 # Podobně u ostatních - nakonec vede na 6 oborů (sekcí)
@@ -206,7 +313,12 @@ if("kar_nejlepsi" %in% names(my.vars.prepared)) {
 if("gender" %in% names(my.vars.prepared)) {
   my.vars.prepared$gender <- as.numeric(as.factor(my.vars.prepared$gender))
 }
+```
 
+
+Correlation matrix computation
+
+```{r}
 # We exclude spec_hlavni from correlation computations since it's purely nominal with many categories (10 levels)
 if("spec_hlavni" %in% names(my.vars.prepared)) {
   my.vars.for_cor <- my.vars.prepared[, !names(my.vars.prepared) %in% "spec_hlavni"]
