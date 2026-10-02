@@ -40,8 +40,8 @@ Set the same values in both Rmds before knitting.
 ## Other files
 
 - `nature.Rmd`, `nature.html` – F. Kalvas's original comparison (superseded by `replication.Rmd`; kept for
-  reference; the Q9 validity item mapping is fixed). It still loads `dataProcessed.RData`, which is no
-  longer produced, so it does not knit as is.
+  reference; the Q9 validity item mapping is fixed). Its comparison with `dataProcessed.RData` (no longer
+  produced) runs only if that file exists, so the script knits.
 - `preprocess.html` – rendered `preprocess.Rmd`.
 - `east_and_west_europe.csv` – used by `nature.Rmd` only.
 
