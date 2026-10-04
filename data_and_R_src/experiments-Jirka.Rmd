@@ -2029,7 +2029,8 @@ LCA_best_model$probs$C16
 # prior class probabilities
 LCA_best_model$P
 
-pdf(file="LCA-BIC-values.pdf", width=5,height=4)
+dir.create("LCA-results", showWarnings = FALSE)
+pdf(file="LCA-results/LCA-BIC-values.pdf", width=5,height=4)
   plot(x=2:8,y=-bic.values, xlab="number of latent classes", ylab="BIC value",type="l", lwd=2)
   grid()
 dev.off()
