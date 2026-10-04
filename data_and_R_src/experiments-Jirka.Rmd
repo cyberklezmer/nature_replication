@@ -76,6 +76,8 @@ MŮJ OBOR – (FIELD CHARACTERISTICS)
 53. 49. V rámci přírodních věd, považuji svůj obor za:
 55. 50. Jaká je moje hlavní specializace (oblast výzkumu)? (Anglicky) (OBORY – bez matematiků)
 
+The new (22.9.2026) problem variables
+
 ```{r}
 dependent.var <- "krize_rep"
 dependent.var2 <- "rep_podil" #Q8
@@ -97,7 +99,7 @@ explanatory.vars2 <- c(
   "fakt_variab",
   "fakt_design",
   "fakt_smula",
-  "fakt_dalsi", #Q16
+  # "fakt_dalsi", #Q16 have free text answers
   "nerep_jaMuj", #Q18
   "nerep_jaCizi", #Q19
   "nerep_oniMuj", #Q20
@@ -140,17 +142,10 @@ explanatory.vars2 <- c(
 # head(my_clean[,explanatory.vars2])
 ```
 
-
+The original (25.2.2025) problem variables
 
 ```{r}
-my <- my_clean
-
 dependent.var <- "krize_rep"
-# If we want to make dependent variable ordinal
-my[[dependent.var]] <- ordered(my[[dependent.var]],
-                              levels = c("Ano, významná krize","Ano, nevýznamná krize","Nevím","Ne, žádná krize není"))
-  barplot(table(my[,dependent.var]),cex.names = 0.8)
-
 explanatory.vars <- c(
 "spec_hlavni",
 "gender",           
@@ -181,18 +176,31 @@ explanatory.vars <- c(
 "obor_ekzaktnost")
 ```
 
+Check that all explanatory.vars are in explanatory.vars2
+
+```{r}
+setdiff(explanatory.vars,explanatory.vars2)
+```
+
 These are variables that were added
 
 ```{r}
 setdiff(explanatory.vars2,explanatory.vars)
 ```
 
-We have to go carefully trough all variables and decided what type they are and how to handle their states
+We have to go carefully trough all variables and decide what type they are and how to handle their states
 
 ```{r}
+my <- my_clean
+
+# We want to make variable "krize_rep" ordinal
+my[["krize_rep"]] <- ordered(my[[dependent.var]],
+                              levels = c("Ano, významná krize","Ano, nevýznamná krize","Nevím","Ne, žádná krize není"))
+# barplot(table(my[,dependent.var]),cex.names = 0.8)
+  
 # Když máme "spec_hlavni" (10 kategorií) asi už nechceme "obor" (12 kategorií, navíc podivných) 
 # Jak se liší Aplikovaná fyzika od Sekce aplikované fyziky? Třeba spojit do jedné.
-# Podobně u ostatních - nakonec vede na 6 oborů (sekcí)
+# Podobně u ostatních - nakonec to vede na 6 oborů (sekcí)
 other.vars <- c("obor")
 
 # joining all states different from rep_Ne to one state called rep_Ano
@@ -200,7 +208,7 @@ my$rep_type <- factor(
   ifelse(my_clean$rep_type == "rep_Ne", "rep_Ne", "rep_Ano"),
   levels = c("rep_Ne", "rep_Ano")
 )
-# table(my_clean$rep_type)
+# table(my$rep_type)
 
 library(dplyr)
 library(forcats)
@@ -211,12 +219,48 @@ my <- my %>%
                              "Spíše souhlasím", "Rozhodně souhlasím"),
                   ordered = TRUE))
 # table(my$nerep_narust)
+my <- my %>%
+  mutate(nerep_problem = fct_collapse(nerep_problem,
+                                     Neutrální = c("Ani souhlasím/ani nesouhlasím", "Nevím")) %>%
+           factor(levels = c("Rozhodně nesouhlasím", "Spíše nesouhlasím", "Neutrální",
+                             "Spíše souhlasím", "Rozhodně souhlasím"),
+                  ordered = TRUE))
+# table(my$nerep_problem)
+
+fakt.vars <- c("fakt_podvod", "fakt_karier", "fakt_dohled", "fakt_recenz", "fakt_selekc", "fakt_replik", "fakt_statis", "fakt_odborn",  "fakt_data",  "fakt_dokume",  "fakt_metody", "fakt_variab", "fakt_design", "fakt_smula")
+fakt.levels <- c("Nikdy", "Zřídka", "Někdy", "Velmi často", "Vždy")
+my[fakt.vars] <- lapply(my[fakt.vars], function(v) {
+  v <- as.character(v)
+  v[v == "Nevím"] <- NA
+  factor(v, levels = fakt.levels, ordered = TRUE)
+})
+# barplot(table(my$fakt_podvod))
+
+# Variables nerep_jaMuj, nerep_jaCizi, nerep_oniMuj will be treated as nominal variables with four states
+# Ano, Ne, Nedělám experimenty, Nepamatuji se 
+# barplot(table(my$nerep_jaMuj))
+# barplot(table(my$nerep_jaCizi))
+# barplot(table(my$nerep_oniMuj))
+
+frek.vars <- c("frek_nerepre", "frek_hacking", "frek_positiv", "frek_popular", "frek_modmet", "frek_oversell", "frek_zbytecne", "frek_salam")
+frek.levels <- c("Nikdy 0%", paste0(seq(10, 90, by = 10), "%"), "Vždy 100%")
+frek.labels <- as.character(seq(0, 100, by = 10))
+
+my[frek.vars] <- lapply(my[frek.vars], function(v) {
+  factor(as.character(v), levels = frek.levels, labels = frek.labels, ordered = TRUE)
+})
+# table(my$frek_nerepre, useNA = "ifany")
+# barplot(table(my$frek_nerepre))
+
+rep.levels <- paste(seq(0, 100, by = 10), "%")   # "0 %", "10 %", ..., "100 %"
+rep.labels <- as.character(seq(0, 100, by = 10))
+my$rep_podil <- factor(as.character(my$rep_podil),
+                             levels = rep.levels, labels = rep.labels,
+                             ordered = TRUE)
+# table(my$rep_podil, useNA = "ifany")
 
 
-
-
-
-# Nyní specifikujeme, které vysvětlující veličiny explanatory.vars se mohou chápat pomocí Likertovy škály.
+# Nyní specifikujeme, které další vysvětlující veličiny se mohou chápat pomocí Likertovy škály.
 # Veličiny mají 5 odpovědí, ale Exaktnost má pouze 3 odpovědi.
 # Jak zacházet s odpovědí "Nevím"? 
 # Spíše než NA jako s neutrálním stavem?
@@ -249,11 +293,11 @@ my$obor_vetsi <- my$obor_mensi
 levels(my$obor_vetsi) <- c("Rozhodně ano", "Spíše ano", "Nevím", "Spíše ne", "Rozhodně ne")
 my$obor_vetsi <- ordered(my$obor_vetsi, levels=c("Rozhodně ne", "Spíše ne", "Nevím", "Spíše ano", "Rozhodně ano"))
 explanatory.vars[explanatory.vars=="obor_mensi"] <- "obor_vetsi"
+explanatory.vars2[explanatory.vars2=="obor_mensi"] <- "obor_vetsi"
 likert.vars[likert.vars=="obor_mensi"] <- "obor_vetsi" 
 my <- subset(my,select=-obor_mensi)
 
-
-# Nyní specifikujeme, které vysvětlující veličiny explanatory.vars se nemohou chápat pomocí Likertovy škály, ale jsou ordinální.
+# Nyní specifikujeme, které další vysvětlující veličiny se nemohou chápat pomocí Likertovy škály, ale jsou ordinální.
 ordinal.vars <- c(
 "vek",          
 "kar_praxe",
@@ -295,7 +339,8 @@ complicated.vars <- c(
   "kar_kategorie")
 
 # zbylé veličiny jsou kategorické 
-categorical.vars <- setdiff(explanatory.vars,union(likert.vars,union(ordinal.vars,union(boolean.vars,complicated.vars))))
+categorical.vars <- setdiff(explanatory.vars2,
+                            union(likert.vars,union(ordinal.vars,union(boolean.vars,complicated.vars))))
 
 # Combine all predictor variables
 all.predictors <- c(likert.vars, ordinal.vars, boolean.vars, categorical.vars)
@@ -315,11 +360,16 @@ my$spec_hlavni <- factor(my$spec_hlavni,
 # This is the default:
 options(contrasts = c("contr.treatment", "contr.poly"))
 ```
+
+
+
 ```{r}
 library(corrplot)
 
 # Prepare the data
-vars <- union(setdiff(explanatory.vars,complicated.vars),"krize_rep")
+# vars <- union(setdiff(explanatory.vars,complicated.vars),"krize_rep")
+vars <- union(setdiff(explanatory.vars2,complicated.vars),c("krize_rep","rep_podil"))
+
 my.vars.prepared <- my[,vars]
 # my.vars.prepared <- my.vars
 
@@ -328,6 +378,15 @@ ordered_vars <- sapply(my.vars.prepared, is.ordered)
 for(var in names(my.vars.prepared)[ordered_vars]) {
   my.vars.prepared[[var]] <- as.numeric(my.vars.prepared[[var]])
 }
+
+my.vars.prepared$rep_type <- as.integer(my.vars.prepared$rep_type == "rep_Ano")
+
+nerep.vars <- c("nerep_jaMuj", "nerep_jaCizi", "nerep_oniMuj")
+my.vars.prepared[nerep.vars] <- lapply(my.vars.prepared[nerep.vars], function(v) {
+  x <- as.character(v)
+  ifelse(x == "Ano", 1L, ifelse(x == "Ne", 0L, NA_integer_))
+})
+# table(my.vars.prepared$nerep_jaMuj, useNA = "ifany")
 
 # Handle character variables
 # kar_nejlepsi: binary variable (Ano/Ne)
@@ -354,78 +413,79 @@ print("Variables for correlation analysis:")
 print(names(my.vars.for_cor))
 
 # Compute correlations
-cor_matrix <- cor(my.vars.for_cor, use = "pairwise.complete")
+cor_matrix <- cor(my.vars.for_cor, use = "pairwise.complete", method = "spearman")
 
-# Reorder the correlation matrix to put krize_rep first
-desired_order <- c("krize_rep", setdiff(colnames(cor_matrix), "krize_rep"))
+# Reorder the correlation matrix to put krize_rep first and rep_podil second
+if ("rep_podil" %in% colnames(cor_matrix)){
+  first.vars <- c("krize_rep", "rep_podil")
+}else{
+  first.vars <- c("krize_rep")
+}
+desired_order <- c(first.vars, setdiff(colnames(cor_matrix), first.vars))
 cor_matrix <- cor_matrix[desired_order, desired_order]
 
 # Visualize the correlation matrix
 pdf(file="correlation-matrix.pdf")
-corrplot(cor_matrix, method = "color", type = "upper", 
-         diag = FALSE, # Explicitly exclude diagonal
-         tl.cex = 0.8, tl.col = "black", order="original")
+corrplot(cor_matrix, method = "color", type = "upper",
+         diag = FALSE, tl.cex = 0.6, tl.col = "black", order = "original",
+         col = rev(COL2("RdBu", 200)))
 dev.off()
 
 ```
+
 The Fruchterman-Reingold algorithm visualizing correlation networks
 
 ```{r}
 library(igraph)
 
-# Set threshold
 threshold <- 0.15
 
-library(igraph)
-
-# Create adjacency matrix with ABSOLUTE values
 adj_matrix <- abs(cor_matrix)
 adj_matrix[adj_matrix < threshold] <- 0
 diag(adj_matrix) <- 0
 
-# Create graph
-cor_graph <- graph_from_adjacency_matrix(adj_matrix, 
-                                        mode = "undirected", 
-                                        weighted = TRUE)
+cor_graph <- graph_from_adjacency_matrix(adj_matrix,
+                                         mode = "undirected",
+                                         weighted = TRUE)
 
-# Get edge list and extract original correlation values
+# Original (signed) correlations as an edge attribute
 edge_list <- as_edgelist(cor_graph)
-original_correlations <- sapply(1:nrow(edge_list), function(i) {
-  v1 <- edge_list[i, 1]
-  v2 <- edge_list[i, 2]
-  return(cor_matrix[v1, v2])
-})
+E(cor_graph)$original_cor <- cor_matrix[edge_list]   # two-column matrix indexing
 
-# Add original correlations as edge attribute
-E(cor_graph)$original_cor <- original_correlations
+# Optional: drop variables with no edge above the threshold
+# cor_graph <- delete_vertices(cor_graph, which(degree(cor_graph) == 0))
 
-# Apply Fruchterman-Reingold layout
+# Layout: more iterations, edge weights (= |cor|) pull correlated variables together
 set.seed(123)
-fr_layout <- layout_with_fr(cor_graph)
+fr_layout <- layout_with_fr(cor_graph, niter = 2000,
+                            weights = E(cor_graph)$weight)
 
-pdf(file="correlation-graph.pdf")
-# Plot with edge width proportional to correlation strength
+# A2 landscape (in inches). Use 16.5 x 11.7 for A3, 33.1 x 23.4 for A1.
+pdf(file = "correlation-graph-new.pdf", width = 23.4, height = 16.5)
+par(mar = c(1, 1, 3, 1))
+
 plot(cor_graph,
      layout = fr_layout,
-     vertex.size = 12,
-     vertex.color = ifelse(V(cor_graph)$name == "krize_rep", "gold", "lightsteelblue"),
-     vertex.label.cex = 0.6,
+     asp = 0,                                  # fill the whole page
+     vertex.size = 4,                          # much smaller circles
+     vertex.color = ifelse(V(cor_graph)$name %in% c("krize_rep","rep_podil"), "gold", "lightsteelblue"),
+     vertex.frame.color = "grey40",
+     vertex.label.cex = 1.0,                   # text can be larger on a big page
      vertex.label.color = "black",
-     edge.width = abs(E(cor_graph)$original_cor) * 8,  # Width based on absolute correlation
-     edge.color = ifelse(E(cor_graph)$original_cor > 0, "red", "blue"),
+     vertex.label.dist = 0.6,                  # labels outside the circles
+     vertex.label.degree = -pi/2,              # ... below them
+     edge.width = abs(E(cor_graph)$original_cor) * 8,
+     edge.color = ifelse(E(cor_graph)$original_cor > 0,
+                         adjustcolor("red", 0.6),
+                         adjustcolor("blue", 0.6)),
      main = "Correlation Network (Fruchterman-Reingold Layout)")
 
-legend("topright", 
+legend("topright",
        legend = c("Positive correlation", "Negative correlation", "Thicker = Stronger"),
        col = c("red", "blue", "black"),
-       lty = c(1, 1, 1),
-       lwd = c(2, 2, 4),
-       cex = 0.8)
+       lty = 1, lwd = c(2, 2, 4), cex = 1.2)
 dev.off()
-
 ```
-
-
 
 Correlation including Halm's correction
 
@@ -616,29 +676,35 @@ for(i in 1:n_edges) {
 E(network)$weight <- edge_weights
 E(network)$color <- edge_colors
 
-# Apply Fruchterman-Reingold layout
-set.seed(123)  # For reproducible layout
-fr_layout <- layout_with_fr(network)
+# Optional: drop variables with no edge after the Holm + threshold filtering
+# network <- delete_vertices(network, which(degree(network) == 0))
 
-pdf(file="correlation-graph-Holms-correction.pdf")
-# Plot the network
-plot(network, 
+# Apply Fruchterman-Reingold layout (more iterations, edge weights = |cor|)
+set.seed(123)
+fr_layout <- layout_with_fr(network, niter = 2000, weights = E(network)$weight)
+
+# A2 landscape (in inches). Use 16.5 x 11.7 for A3, 33.1 x 23.4 for A1.
+pdf(file = "correlation-graph-Holms-correction-new.pdf", width = 23.4, height = 16.5)
+par(mar = c(1, 1, 3, 1))
+
+plot(network,
      layout = fr_layout,
-     vertex.size = 12,
-     vertex.color = ifelse(V(network)$name == "krize_rep", "gold", "lightsteelblue"),
-     vertex.label.cex = 0.6,
+     asp = 0,                                  # fill the whole page
+     vertex.size = 4,                          # much smaller circles
+     vertex.color = ifelse(V(cor_graph)$name %in% c("krize_rep","rep_podil"), "gold", "lightsteelblue"),
+     vertex.frame.color = "grey40",
+     vertex.label.cex = 1.0,
      vertex.label.color = "black",
-     edge.width = E(network)$weight * 8,  # Scale edge width by correlation strength
-     edge.color = E(network)$color,
+     vertex.label.dist = 0.6,                  # labels outside the circles
+     vertex.label.degree = -pi/2,              # ... below them
+     edge.width = E(network)$weight * 8,
+     edge.color = adjustcolor(E(network)$color, 0.6),   # semi-transparent edges
      main = "Correlation Network (Holm-corrected, Fruchterman-Reingold Layout)")
 
-# Add legend
-legend("topleft", 
+legend("topleft",
        legend = c("Positive correlation", "Negative correlation", "Thicker = Stronger"),
        col = c("red", "blue", "black"),
-       lty = c(1, 1, 1),
-       lwd = c(2, 2, 4),
-       cex = 0.8)
+       lty = 1, lwd = c(2, 2, 4), cex = 1.2)
 dev.off()
 
 # Print summary statistics
@@ -680,12 +746,12 @@ str(my.vars.bn.discrete)
 library(dplyr)
 # Filter to only existing variables
 missing_pct <- my.vars.bn.discrete %>%
-  dplyr::select(all_of(names(my.vars.bn.discrete ))) %>%
+  dplyr::select(all_of(names(my.vars.bn.discrete))) %>%
   summarise_all(~mean(is.na(.)) * 100)
-# Keep only variables with <10% missing
-good_vars <- names(missing_pct)[missing_pct < 10]
+# Keep only variables with <15% missing
+good_vars <- names(missing_pct)[missing_pct < 15]
 # These are variables that are frequently missing
-print(setdiff(all.predictors,good_vars))
+print(setdiff(names(my.vars.bn.discrete),good_vars))
 
 # Remove columns with too many missing values first, then rows
 my.vars.bn.clean <- my.vars.bn.discrete[, good_vars]
@@ -707,7 +773,7 @@ arcs(bn_structure)  # Shows the directed edges
 score(bn_structure, my.vars.bn.clean) # BIC score
 
 # Other structure learning algorithms:
-bn_structure_tabu <- tabu(my.vars.bn.clean)
+  bn_structure_tabu <- tabu(my.vars.bn.clean)
 plot(bn_structure_tabu)
 #
 bn_structure_mmhc <- mmhc(my.vars.bn.clean)
@@ -764,7 +830,6 @@ if (requireNamespace("DiagrammeR", quietly = TRUE)) {
         color="navy", fontcolor="black", fontname="Arial", fontsize="12"];
   
 '
-    
     # Add nodes with labels
     for(node in nodes_list) {
       # Keep original node names with underscores
@@ -778,7 +843,7 @@ if (requireNamespace("DiagrammeR", quietly = TRUE)) {
       dot_string <- paste0(dot_string, '  // Directed edges\n')
       for(i in 1:nrow(directed_edges)) {
         dot_string <- paste0(dot_string, '  "', directed_edges[i,1], '" -> "', 
-                           directed_edges[i,2], '" [arrowhead="vee", color="darkblue", penwidth="2"];\n')
+                             directed_edges[i,2], '" [arrowhead="vee", color="darkblue", penwidth="2"];\n')
       }
     }
     
@@ -787,7 +852,7 @@ if (requireNamespace("DiagrammeR", quietly = TRUE)) {
       dot_string <- paste0(dot_string, '\n  // Undirected edges\n')
       for(i in 1:nrow(undirected_edges)) {
         dot_string <- paste0(dot_string, '  "', undirected_edges[i,1], '" -> "', 
-                           undirected_edges[i,2], '" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];\n')
+                             undirected_edges[i,2], '" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];\n')
       }
     }
     
@@ -1856,7 +1921,7 @@ Cluster analysis
 library(mclust)
 
 # Remove variables with excessive missing values (e.g., >20% missing)
-threshold <- 0.1
+threshold <- 0.15
 my.vars.clean <- my.vars.for_cor[, sapply(my.vars.for_cor, function(x) mean(is.na(x))) < threshold]
 
 # Then remove remaining incomplete cases
@@ -1974,28 +2039,36 @@ Find variables that are most related to the latent class
 
 ```{r, results='hide'}
 library(DescTools)
-lng <- length(LCA_best_model$probs)
-rr <- rep(0,lng)
-names(rr) <- names(LCA_best_model$probs)
-for (i in 1:lng){
-  cpt <- LCA_best_model$probs[i][[1]]
-  rownames(cpt) <- substr(rownames(LCA_best_model$probs[1][[1]]), 1, nchar(rownames(LCA_best_model$probs[1][[1]])) - 2)
-  pt  <- cpt * matrix(rep(LCA_best_model$P,ncol(cpt)),nrow=3,ncol=ncol(cpt))
-  rr[i] <- CramerV(pt)
-}
-rr <- sort(rr,decreasing = TRUE)
 
-for (i in 1:length(rr)){
+K   <- length(LCA_best_model$P)          # number of latent classes
+lng <- length(LCA_best_model$probs)
+
+# class labels from the first variable, "class 1: " -> "class 1"
+cls.names <- rownames(LCA_best_model$probs[[1]])
+cls.names <- substr(cls.names, 1, nchar(cls.names) - 2)
+
+# joint table P(class, category) = P(class) * P(category | class)
+joint.table <- function(var.name) {
+  cpt <- LCA_best_model$probs[[var.name]]
+  rownames(cpt) <- cls.names
+  cpt * LCA_best_model$P                 # P is recycled down the columns, so row i is multiplied by P[i]
+}
+
+rr <- sapply(names(LCA_best_model$probs), function(v) CramerV(joint.table(v)))
+rr <- sort(rr, decreasing = TRUE)
+
+dir.create("LCA-results", showWarnings = FALSE)
+class.cols <- hcl.colors(K, "Set 2")     # one color per class
+
+for (i in seq_along(rr)) {
   var.name <- names(rr)[i]
-  cpt <- LCA_best_model$probs[var.name][[1]]
-  rownames(cpt) <- substr(rownames(LCA_best_model$probs[1][[1]]), 1, nchar(rownames(LCA_best_model$probs[1][[1]])) - 2)
-  pt  <- cpt * matrix(rep(LCA_best_model$P,ncol(cpt)),nrow=3,ncol=ncol(cpt))
-  fname <- paste("LCA-results/LCA-",i,"-",var.name,".pdf",sep="")
-  pdf(file=fname)
-    mosaicplot(t(pt), col = c(4,7,6), main="", dir=c("h","v"), las=2, ylab=var.name, xlab="latent class")
+  pt    <- joint.table(var.name)
+  fname <- paste("LCA-results/LCA-", i, "-", var.name, ".pdf", sep = "")
+  pdf(file = fname)
+  mosaicplot(t(pt), col = class.cols, main = "", dir = c("h", "v"),
+             las = 2, ylab = var.name, xlab = "latent class")
   dev.off()
 }
-
 ```
 
 

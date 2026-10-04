@@ -3,8 +3,19 @@ digraph BN {
   node [shape="ellipse", style="filled", fillcolor="lightsteelblue", 
         color="navy", fontcolor="black", fontname="Arial", fontsize="12"];
   
+  "rep_type" [label="rep_type"];
+  "nerep_narust" [label="nerep_narust"];
+  "nerep_problem" [label="nerep_problem"];
+  "frek_nerepre" [label="frek_nerepre"];
+  "frek_positiv" [label="frek_positiv"];
+  "frek_popular" [label="frek_popular"];
+  "frek_modmet" [label="frek_modmet"];
+  "frek_oversell" [label="frek_oversell"];
+  "frek_zbytecne" [label="frek_zbytecne"];
+  "frek_salam" [label="frek_salam"];
   "gender" [label="gender"];
   "kar_praxe" [label="kar_praxe"];
+  "kar_titul" [label="kar_titul"];
   "kar_citace" [label="kar_citace"];
   "kar_nejlepsi" [label="kar_nejlepsi"];
   "pomer_zakladni" [label="pomer_zakladni"];
@@ -17,28 +28,44 @@ digraph BN {
   "obor_verejnos" [label="obor_verejnos"];
   "obor_komplexn" [label="obor_komplexn"];
   "obor_vetsi" [label="obor_vetsi"];
+  "cinnost_teori" [label="cinnost_teori"];
   "cinnost_exper" [label="cinnost_exper"];
+  "cinnost_vyvoj" [label="cinnost_vyvoj"];
   "obor_ekzaktnost" [label="obor_ekzaktnost"];
   "krize_rep" [label="krize_rep"];
   "spec_hlavni" [label="spec_hlavni"];
 
 
   // Undirected edges
+  "rep_type" -> "frek_positiv" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "rep_type" -> "obor_konkuren" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "rep_type" -> "krize_rep" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "nerep_narust" -> "krize_rep" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "nerep_problem" -> "krize_rep" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "frek_nerepre" -> "frek_positiv" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "frek_nerepre" -> "frek_oversell" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "frek_popular" -> "frek_oversell" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "frek_modmet" -> "frek_zbytecne" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "frek_oversell" -> "frek_zbytecne" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "frek_salam" -> "obor_ekzaktnost" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "gender" -> "kar_citace" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "kar_praxe" -> "kar_citace" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "kar_praxe" -> "krize_rep" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "kar_titul" -> "kar_citace" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "kar_citace" -> "kar_nejlepsi" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "kar_nejlepsi" -> "pomer_zakladni" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "pomer_zakladni" -> "cinnost_vyvoj" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_dotovany" -> "obor_priliv" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_dotovany" -> "obor_medializ" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "obor_dotovany" -> "cinnost_exper" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_konkuren" -> "obor_priliv" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "obor_konkuren" -> "obor_komplexn" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_konkuren" -> "obor_vetsi" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "obor_konkuren" -> "krize_rep" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "obor_konkuren" -> "cinnost_teori" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_rychly" -> "obor_priliv" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "obor_rychly" -> "obor_komplexn" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_priliv" -> "obor_publikac" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "obor_medializ" -> "obor_verejnos" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "cinnost_teori" -> "cinnost_exper" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "cinnost_teori" -> "cinnost_vyvoj" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "cinnost_exper" -> "cinnost_vyvoj" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
   "cinnost_exper" -> "spec_hlavni" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
-  "obor_ekzaktnost" -> "spec_hlavni" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
+  "cinnost_vyvoj" -> "obor_ekzaktnost" [arrowhead="none", arrowtail="none", dir="none", color="darkblue", penwidth="2"];
 }
