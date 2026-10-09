@@ -691,7 +691,7 @@ plot(network,
      layout = fr_layout,
      asp = 0,                                  # fill the whole page
      vertex.size = 4,                          # much smaller circles
-     vertex.color = ifelse(V(cor_graph)$name %in% c("krize_rep","rep_podil"), "gold", "lightsteelblue"),
+     vertex.color = ifelse(V(network)$name %in% c("krize_rep","rep_podil"), "gold", "lightsteelblue"),
      vertex.frame.color = "grey40",
      vertex.label.cex = 1.0,
      vertex.label.color = "black",
@@ -725,6 +725,17 @@ print(round(cor_matrix[1:min(5,nrow(cor_matrix)), 1:min(5,ncol(cor_matrix))], 3)
 
 print("Holm-corrected p-values (first 5x5):")
 print(round(p_matrix_adjusted[1:min(5,nrow(p_matrix_adjusted)), 1:min(5,ncol(p_matrix_adjusted))], 4))
+
+target <- c("rep_podil", "krize_rep")
+df <- as_data_frame(network, what = "edges")        # columns: from, to, weight, color, ...
+df.sel <- df[df$from %in% target | df$to %in% target, ]
+
+# signed correlation recovered from the edge color (red = positive, blue = negative)
+df.sel$cor <- ifelse(df.sel$color == "red", df.sel$weight, -df.sel$weight)
+
+# sort by strength
+df.sel <- df.sel[order(-abs(df.sel$cor)), c("from", "to", "cor")]
+df.sel
 
 ```
 
