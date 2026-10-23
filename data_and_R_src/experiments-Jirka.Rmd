@@ -142,6 +142,15 @@ explanatory.vars2 <- c(
 # head(my_clean[,explanatory.vars2])
 ```
 
+The variables to delete after the Oct 19, 2026 meeting with Petr Jedlička
+
+```{r}
+vars.to.delete <- c("cinnost_matem",  "cinnost_model"   "cinnost_teori"  
+[51] "cinnost_exper"   "cinnost_kateg"   "cinnost_vyvoj")
+```
+
+
+
 The original (25.2.2025) problem variables
 
 ```{r}
