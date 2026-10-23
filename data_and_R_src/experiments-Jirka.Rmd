@@ -12,9 +12,9 @@ source("functions.R")
 
 ```{r message=FALSE, results='hide'}
 knitr::knit("prepare-data.Rmd", tangle = TRUE)
+PLOT.MOSAIC.PLOTS <- FALSE
 source('prepare-data.R')
 ```
-
 
 - čísla otázek jsou uvedena v souboru Objektivita přírodních věd - I. část (MU).pdf v adresáři materials
 - propojení názvů a popisu je v souboru názvy-a-popis.xlsx v adresáři data_and_R_src
@@ -145,8 +145,17 @@ explanatory.vars2 <- c(
 The variables to delete after the Oct 19, 2026 meeting with Petr Jedlička
 
 ```{r}
-vars.to.delete <- c("cinnost_matem",  "cinnost_model"   "cinnost_teori"  
-[51] "cinnost_exper"   "cinnost_kateg"   "cinnost_vyvoj")
+vars.to.delete <- c("cinnost_matem",  "cinnost_model",  "cinnost_teori", "cinnost_exper", "cinnost_kateg","cinnost_vyvoj", "obor_ekzaktnost", "pomer_zakladni", "pomer_veda")
+
+group.fakt <- c("fakt_podvod", "fakt_karier", "fakt_dohled", "fakt_recenz", "fakt_selekc", "fakt_replik", "fakt_statis", "fakt_odborn", "fakt_data", "fakt_dokume", "fakt_metody", "fakt_variab", "fakt_design", "fakt_smula")
+
+group.nerep <- c("nerep_jaMuj", "nerep_jaCizi", "nerep_oniMuj")
+
+group.freq <- c("frek_nerepre", "frek_hacking", "frek_positiv", "frek_popular", "frek_modmet", "frek_oversell", "frek_zbytecne", "frek_salam")
+
+group.sociodem <- c("gender", "vek", "kar_praxe", "kar_titul", "kar_citace", "kar_nejlepsi", "kar_kategorie")
+
+group.core <- c("rep_podil", "krize_rep", "nerep_problem",  "nerep_narust", "rep_type")
 ```
 
 
