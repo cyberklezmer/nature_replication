@@ -15,7 +15,6 @@ knitr::knit("prepare-data.Rmd", tangle = TRUE)
 PLOT.MOSAIC.PLOTS <- FALSE
 source('prepare-data.R')
 ```
-
 - čísla otázek jsou uvedena v souboru Objektivita přírodních věd - I. část (MU).pdf v adresáři materials
 - propojení názvů a popisu je v souboru názvy-a-popis.xlsx v adresáři data_and_R_src
 
@@ -40,7 +39,43 @@ Variables classification into following groups:
   - complicated (will be ignored)
   - other variables 
   
-# Petr Jedlička, email z 22.9.2026
+The original (25.2.2025) problem variables
+
+```{r}
+dependent.var <- "krize_rep"
+explanatory.vars <- c(
+"spec_hlavni",
+"gender",           
+"vek",          
+"kar_praxe",
+"kar_titul",       
+"kar_citace",      
+"kar_nejlepsi",     
+"kar_kategorie",
+"pomer_veda",
+"pomer_zakladni",
+"obor_dotovany",
+"obor_konkuren",
+"obor_tlak",
+"obor_rychly",
+"obor_priliv",
+"obor_publikac",
+"obor_medializ",
+"obor_verejnos",
+"obor_komplexn",
+"obor_mensi",
+"cinnost_matem",
+"cinnost_model",
+"cinnost_teori",
+"cinnost_exper",
+"cinnost_kateg",
+"cinnost_vyvoj",
+"obor_ekzaktnost")
+```
+
+## Petr Jedlička, email z 22.9.2026
+More variables included:
+
 Q 6. 6. Existuje podle mého názoru krize reprodukovatelnosti? 
 Q 8. 8. Jaký podíl publikovaných výsledků v mém oboru je reprodukovatelný? (Uveďte svůj nejlepší ODHAD)
 --
@@ -142,59 +177,14 @@ explanatory.vars2 <- c(
 # head(my_clean[,explanatory.vars2])
 ```
 
-The variables to delete after the Oct 19, 2026 meeting with Petr Jedlička
+## Oct 19, 2026 meeting with Petr Jedlička
+variables to delete
 
 ```{r}
 vars.to.delete <- c("cinnost_matem",  "cinnost_model",  "cinnost_teori", "cinnost_exper", "cinnost_kateg","cinnost_vyvoj", "obor_ekzaktnost", "pomer_zakladni", "pomer_veda")
-
-group.fakt <- c("fakt_podvod", "fakt_karier", "fakt_dohled", "fakt_recenz", "fakt_selekc", "fakt_replik", "fakt_statis", "fakt_odborn", "fakt_data", "fakt_dokume", "fakt_metody", "fakt_variab", "fakt_design", "fakt_smula")
-
-group.nerep <- c("nerep_jaMuj", "nerep_jaCizi", "nerep_oniMuj")
-
-group.freq <- c("frek_nerepre", "frek_hacking", "frek_positiv", "frek_popular", "frek_modmet", "frek_oversell", "frek_zbytecne", "frek_salam")
-
-group.sociodem <- c("gender", "vek", "kar_praxe", "kar_titul", "kar_citace", "kar_nejlepsi", "kar_kategorie")
-
-group.core <- c("rep_podil", "krize_rep", "nerep_problem",  "nerep_narust", "rep_type")
 ```
 
-
-
-The original (25.2.2025) problem variables
-
-```{r}
-dependent.var <- "krize_rep"
-explanatory.vars <- c(
-"spec_hlavni",
-"gender",           
-"vek",          
-"kar_praxe",
-"kar_titul",       
-"kar_citace",      
-"kar_nejlepsi",     
-"kar_kategorie",
-"pomer_veda",
-"pomer_zakladni",
-"obor_dotovany",
-"obor_konkuren",
-"obor_tlak",
-"obor_rychly",
-"obor_priliv",
-"obor_publikac",
-"obor_medializ",
-"obor_verejnos",
-"obor_komplexn",
-"obor_mensi",
-"cinnost_matem",
-"cinnost_model",
-"cinnost_teori",
-"cinnost_exper",
-"cinnost_kateg",
-"cinnost_vyvoj",
-"obor_ekzaktnost")
-```
-
-Check that all explanatory.vars are in explanatory.vars2
+Check that all explanatory.vars are in explanatory.vars2, i.e. explanatory.vars2 is a superset of explanatory.vars
 
 ```{r}
 setdiff(explanatory.vars,explanatory.vars2)
@@ -379,11 +369,71 @@ my$spec_hlavni <- factor(my$spec_hlavni,
 options(contrasts = c("contr.treatment", "contr.poly"))
 ```
 
-
+## Oct 19, 2026 meeting with Petr Jedlička
+groups to analyze by PCA
 
 ```{r}
-library(corrplot)
+group.fakt <- c("fakt_podvod", "fakt_karier", "fakt_dohled", "fakt_recenz", "fakt_selekc", "fakt_replik", "fakt_statis", "fakt_odborn", "fakt_data", "fakt_dokume", "fakt_metody", "fakt_variab", "fakt_design", "fakt_smula")
 
+group.nerep <- c("nerep_jaMuj", "nerep_jaCizi", "nerep_oniMuj")
+
+# An important problem is the missing data in frek_hacking: 
+# 494 of 878 respondents (56%) are NA, compared with 60 to 118 for the other frek_* items. 
+# That probably means many respondents could not judge p-hacking (for example, fields that don’t use significance testing).
+# Dropping frek_hacking does not change the conclusion. 
+# Both versions give the same number of PCA components, so the item can be left out without changing the structure.
+#
+# group.freq <- c("frek_nerepre", "frek_hacking", "frek_positiv", "frek_popular", "frek_modmet", "frek_oversell", "frek_zbytecne", "frek_salam")
+group.freq <- c("frek_nerepre", "frek_positiv", "frek_popular", "frek_modmet", "frek_oversell", "frek_zbytecne", "frek_salam")
+
+# Note that "obor_mensi" was replaced by "obor_vetsi" 
+group.obor <- c("obor_dotovany", "obor_konkuren", "obor_tlak", "obor_rychly", "obor_priliv", "obor_publikac", "obor_medializ", "obor_verejnos", "obor_komplexn", "obor_vetsi")
+
+# The variable kar_kategorie has 27 different values we will not use it
+# spec_hlavni is different from other variables - it has many (10) nominal states we will omit it
+# group.sociodem <- c("gender", "vek", "kar_praxe", "kar_titul", "kar_citace", "kar_nejlepsi", "kar_kategorie")
+group.sociodem <- c("gender", "vek", "kar_praxe", "kar_titul", "kar_citace", "kar_nejlepsi")
+
+group.core <- c("rep_podil", "krize_rep", "nerep_problem",  "nerep_narust", "rep_type")
+
+groups <- list(FACTORS=group.fakt, NOREP=group.nerep, FREQ=group.freq, FIELD=group.obor, DEM=group.sociodem, CORE=group.core)
+
+group_names_full <- c(
+  FACTORS = "Factors contributing to non-reproducibility",
+  NOREP = "Replication failure experience",
+  FREQ = "Perceived prevalence of questionable research practices",
+  FIELD = "Features of one’s research field",
+  DEM = "Respondent demographics and career profile",
+  CORE = "Reproducibility crisis awareness and perceptions"
+)
+
+group_colors <- c(
+  FACTORS = "#AED6F1",  # light blue
+  NOREP = "#A9DFBF",  # light green
+  FREQ = "#F9E79F",  # light yellow
+  FIELD = "#F5CBA7",  # light orange
+  DEM = "#D7BDE2",  # light purple
+  CORE = "#F1948A"  # light red
+)
+
+# --- Dark colors for PC nodes (same hue, dark version) ---
+pc_colors <- c(
+  FACTORS = "#1A5276",  # dark blue
+  NOREP = "#1E8449",  # dark green
+  FREQ = "#B7950B",  # dark yellow/gold
+  FIELD = "#A04000",  # dark orange
+  DEM = "#6C3483",  # dark purple
+  CORE = "#922B21"  # dark red
+)
+
+groups.together <- Reduce(union, groups)
+setdiff(union(explanatory.vars2,union(dependent.var,dependent.var2)), union(groups.together,vars.to.delete))
+
+```
+Prepare data for analysis that requires ordinal numerical variables 
+Currently it is applied to explanatory.vars2
+
+```{r}
 # Prepare the data
 # vars <- union(setdiff(explanatory.vars,complicated.vars),"krize_rep")
 vars <- union(setdiff(explanatory.vars2,complicated.vars),c("krize_rep","rep_podil"))
@@ -416,12 +466,29 @@ if("kar_nejlepsi" %in% names(my.vars.prepared)) {
 if("gender" %in% names(my.vars.prepared)) {
   my.vars.prepared$gender <- as.numeric(as.factor(my.vars.prepared$gender))
 }
+
+my.vars <- encode_ordinal(my.vars.prepared, groups = groups)
+# The direction is reversed. Code 1 is “Yes, significant crisis” and code 4 is “No crisis”, so higher means less crisis. 
+# The other items (nerep_problem, nerep_narust) run the other way.
+my.vars$krize_rep <- 5 - my.vars$krize_rep   # 1 = no crisis, 2 = don't know, 3 = insignificant, 4 = significant
+
+# Percentage of Reproducible Results swapped to Percentage of Non-Reproducible Results
+my.vars$rep_podil <- 12 - my.vars$rep_podil # 1 = all reproducible results, ... , 11 ... all non-reproducible results
+
 ```
 
+PCA analysis for the groups using the dataset "my.vars"
+
+```{r}
+source("PCA-functions.R")
+results <- PCA.analysis(my.vars, groups)
+```
 
 Correlation matrix computation
 
 ```{r}
+library(corplot)
+
 # We exclude spec_hlavni from correlation computations since it's purely nominal with many categories (10 levels)
 if("spec_hlavni" %in% names(my.vars.prepared)) {
   my.vars.for_cor <- my.vars.prepared[, !names(my.vars.prepared) %in% "spec_hlavni"]
