@@ -482,11 +482,14 @@ my.vars$rep_podil <- 12 - my.vars$rep_podil # 1 = all reproducible results, ... 
 PCA analysis for the groups using the dataset "my.vars"
 
 ```{r}
+SPLIT.ANALYSIS <- FALSE
 results <- PCA.analysis(my.vars, groups)
-source("split_half_congruence.R")
-sh <- lapply(groups[c("FIELD", "CORE", "DEM")],
-             function(cols) split_half_congruence(my.vars, cols))
-lapply(sh, `[[`, "summary")
+if (SPLIT.ANALYSIS){
+  source("split_half_congruence.R")
+  sh <- lapply(groups[c("FIELD", "CORE", "DEM")],
+               function(cols) split_half_congruence(my.vars, cols))
+  lapply(sh, `[[`, "summary")
+}
 ```
 
 Correlation matrix computation
