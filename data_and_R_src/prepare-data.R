@@ -110,15 +110,15 @@ my_clean$obor_tlak <- fct_collapse(my_clean$obor_tlak,
 )
 
 # Check the new distributions
-cat("=== After cleaning ===\n")
-for(var in c("vek", "kar_titul", "pomer_veda", "pomer_zakladni", "obor_tlak")) {
-  cat("\n", var, ":\n")
-  print(table(my_clean[[var]]))
-}
+# cat("=== After cleaning ===\n")
+# for(var in c("vek", "kar_titul", "pomer_veda", "pomer_zakladni", "obor_tlak")) {
+#   cat("\n", var, ":\n")
+#   print(table(my_clean[[var]]))
+# }
 
 my <- my_clean
 
-
+if (PLOT.MOSAIC.PLOTS){
 ## --------------------------------------------------------------------------------------------------------------
 # Save current par settings
 old_par <- par(no.readonly = TRUE)
@@ -210,5 +210,6 @@ dev.off()
 # Restore original settings
 # par(old_par)
 on.exit(par(old_par))
+}
 
 
