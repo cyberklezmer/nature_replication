@@ -434,7 +434,9 @@ Prepare data for analysis that requires ordinal numerical variables
 Currently it is applied to explanatory.vars2
 
 ```{r}
-# Prepare the data
+# Prepare the data for PCA and further methods
+source("PCA-functions.R")
+
 # vars <- union(setdiff(explanatory.vars,complicated.vars),"krize_rep")
 vars <- union(setdiff(explanatory.vars2,complicated.vars),c("krize_rep","rep_podil"))
 
@@ -480,8 +482,11 @@ my.vars$rep_podil <- 12 - my.vars$rep_podil # 1 = all reproducible results, ... 
 PCA analysis for the groups using the dataset "my.vars"
 
 ```{r}
-source("PCA-functions.R")
 results <- PCA.analysis(my.vars, groups)
+source("split_half_congruence.R")
+sh <- lapply(groups[c("FIELD", "CORE", "DEM")],
+             function(cols) split_half_congruence(my.vars, cols))
+lapply(sh, `[[`, "summary")
 ```
 
 Correlation matrix computation
