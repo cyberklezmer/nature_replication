@@ -12,10 +12,10 @@
 library(psych)
 
 split_half_congruence <- function(w, cols, B = 500, seed = 1) {
-  
+
   dat <- as.data.frame(lapply(w[, cols, drop = FALSE], as.numeric))
   nfac <- 2   # matching below is written for two components
-  
+
   cormat <- function(d) {
     rng <- diff(range(as.matrix(d), na.rm = TRUE)) + 1
     R <- if (rng > 8) {
@@ -23,15 +23,27 @@ split_half_congruence <- function(w, cols, B = 500, seed = 1) {
     } else {
       suppressWarnings(polychoric(d, global = FALSE)$rho)
     }
+    if (anyNA(R)) {
+      # sparse half-sample tables can give NA polychoric correlations:
+      # replace those pairs by Spearman correlations
+      n_na_pairs <<- n_na_pairs + sum(is.na(R[lower.tri(R)]))
+      Rs <- cor(d, method = "spearman", use = "pairwise.complete.obs")
+      R[is.na(R)] <- Rs[is.na(R)]
+    }
     cor.smooth(R)
   }
-  
+
   load_vm <- function(d) {
     unclass(principal(cormat(d), nfactors = nfac, rotate = "varimax")$loadings)[, 1:nfac, drop = FALSE]
   }
-  
-  safe_load <- function(d) tryCatch(suppressWarnings(load_vm(d)), error = function(e) NULL)
-  
+
+  first_error <- NULL
+  n_na_pairs <- 0
+  safe_load <- function(d) tryCatch(suppressWarnings(load_vm(d)), error = function(e) {
+    if (is.null(first_error)) first_error <<- conditionMessage(e)
+    NULL
+  })
+
   # congruence between two loading matrices (half A vs half B): the two halves
   # are independent, unlike a half compared with the full sample it belongs to
   match_pair <- function(LA, LB) {
@@ -40,7 +52,7 @@ split_half_congruence <- function(w, cols, B = 500, seed = 1) {
     if (phi[1, 1] + phi[2, 2] >= phi[1, 2] + phi[2, 1]) c(phi[1, 1], phi[2, 2])
     else c(phi[1, 2], phi[2, 1])
   }
-  
+
   set.seed(seed)
   n <- nrow(dat)
   res <- matrix(NA_real_, B, nfac, dimnames = list(NULL, paste0("RC", 1:nfac)))
@@ -49,14 +61,17 @@ split_half_congruence <- function(w, cols, B = 500, seed = 1) {
     res[b, ] <- match_pair(safe_load(dat[idx, , drop = FALSE]),
                            safe_load(dat[-idx, , drop = FALSE]))
   }
-  
+
   summ <- t(apply(res, 2, function(x)
     c(median = median(x, na.rm = TRUE),
       q025   = unname(quantile(x, 0.025, na.rm = TRUE)),
       share_ge_.85 = mean(x >= 0.85, na.rm = TRUE),
       failed = sum(is.na(x)))))
-  
-  list(congruence = res, summary = round(summ, 2))
+
+  if (!is.null(first_error)) message("First error in a split: ", first_error)
+  if (n_na_pairs > 0) message(n_na_pairs, " NA correlations replaced by Spearman in half-samples")
+
+  list(congruence = res, summary = round(summ, 2), first_error = first_error)
 }
 
 ## Usage:

@@ -1,0 +1,492 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[authoryear,round]{natbib}
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=black]{hyperref}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\var}[1]{\texttt{#1}}
+
+\title{Structure of Researchers' Views on Irreproducibility:\\
+Principal Component Analysis of Survey Item Groups}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Six groups of ordinal survey items on reproducibility were analysed separately by principal component analysis (PCA) based on polychoric or Spearman correlations, with pairwise deletion of missing values and no imputation. The number of components was assessed by parallel analysis, and the retained components were interpreted after varimax rotation. Parallel analysis suggested two components for one group and one component for the other five, but in four groups the second component was interpretable, only slightly below the random-data benchmark, and replicated in 500 random split-half comparisons. An oblique rotation showed that the two components are weakly to moderately correlated in five of the six groups ($r$ between 0.10 and 0.39). We therefore describe those four groups by two components. In the remaining two groups the second component is either a single item or rests on only three items, and we report them as one dimension plus a separate item.
+\end{abstract}
+
+\section{Data and item groups}
+
+The analysis uses $N=878$ respondents. The items were analysed in six thematic groups, each on its own. Missing values differ strongly between items (Table~\ref{tab:scales}), so each group uses all pairwise available observations and not only complete cases.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{@{}l c L{9.2cm}@{}}
+\toprule
+Group & Items & Content (item numbers refer to the questionnaire)\\
+\midrule
+FACTORS & 14 & Contribution of fourteen factors to irreproducibility (Q16), \var{fakt\_*}\\
+NOREP & 3 & Failed replication experience: own experiment, someone else's experiment, own result not reproduced by others (Q18--20), yes/no\\
+FREQ & 7 & Frequency of questionable research practices observed in one's field (Q23), \var{frek\_*}; \var{frek\_hacking} excluded (see below)\\
+FIELD & 10 & Characteristics of one's field: funding, competition, pressure, media, field size, etc.\ (Q47--48), \var{obor\_*}\\
+DEM & 6 & Respondent profile: gender, age, years in research, degree, citations, top-journal publication (Q38--43)\\
+CORE & 5 & Reproducibility crisis: awareness, existence, estimated reproducible share, seriousness, increase (Q5--9)\\
+\bottomrule
+\end{tabular}
+\caption{Item groups.}
+\label{tab:groups}
+\end{table}
+
+\subsection{Response scales}
+
+Table~\ref{tab:scales} gives the response scale of every item as coded in the analysis, the direction of the codes, and the number of valid answers. The labels were translated from Czech. Higher codes always mean more of what the item describes; where the questionnaire scale ran the other way (\var{rep\_podil}, \var{krize\_rep}, \var{obor\_vetsi}) the codes were reversed. For each group the table also gives the number of respondents with no missing item and the type of correlation used.
+
+{\small
+\begin{longtable}{@{}L{2.7cm} L{5.9cm} L{3.3cm} L{2.6cm}@{}}
+\caption{Response scales as coded in the analysis, direction of the codes, and number of valid answers per item.}\label{tab:scales}\\
+\toprule
+Item & Scale (code = label) & Higher code means & Valid $N$\\
+\midrule
+\endfirsthead
+\toprule
+Item & Scale (code = label) & Higher code means & Valid $N$\\
+\midrule
+\endhead
+\midrule
+\multicolumn{4}{r}{\emph{continued on next page}}\\
+\endfoot
+\bottomrule
+\endlastfoot
+\multicolumn{4}{@{}l}{\textbf{FACTORS}: 14 items; 343 complete cases; polychoric correlations}\\
+\var{fakt\_*} & 1 never, 2 rarely, 3 sometimes, 4 very often, 5 always & Factor contributes more often & 608--738\\
+\addlinespace
+\multicolumn{4}{@{}l}{\textbf{NOREP}: 3 items; 451 complete cases; polychoric correlations}\\
+\var{nerep\_jaMuj}, \var{nerep\_jaCizi}, \var{nerep\_oniMuj} & 0 no, 1 yes (``I do not do experiments'' and ``I do not remember'' set to missing) & Failed replication experienced & 515--654\\
+\addlinespace
+\multicolumn{4}{@{}l}{\textbf{FREQ}: 7 items; 582 complete cases; Spearman correlations}\\
+\var{frek\_*} & 0, 10, 20, \dots, 100 (coded 1--11) & Practice observed more often & 760--818\\
+\addlinespace
+\multicolumn{4}{@{}l}{\textbf{FIELD}: 10 items; 661 complete cases; polychoric correlations}\\
+\var{obor\_*} & 1 definitely not, 2 rather not, 3 don't know, 4 rather yes, 5 definitely yes & Field has the characteristic to a greater degree & 878; 661 for \var{obor\_tlak} (only codes 3--5 observed)\\
+\addlinespace
+\multicolumn{4}{@{}l}{\textbf{CORE}: 5 items; 700 complete cases; Spearman correlations}\\
+\var{rep\_type} & 0 no, 1 yes & Has heard of the crisis & 806\\
+\var{krize\_rep} & 1 no crisis, 2 don't know, 3 yes, insignificant crisis, 4 yes, significant crisis & Crisis judged more serious & 804\\
+\var{rep\_podil} & 1 = 100\%, 2 = 90\%, \dots, 11 = 0\% (estimated share of reproducible results) & Smaller share reproducible (scale reversed) & 718\\
+\var{nerep\_problem}, \var{nerep\_narust} & 1 strongly disagree, 2 somewhat disagree, 3 neutral, 4 somewhat agree, 5 strongly agree & Stronger agreement & 790, 786\\
+\addlinespace
+\multicolumn{4}{@{}l}{\textbf{DEM}: 6 items; 646 complete cases; polychoric correlations}\\
+\var{gender} & 0 man, 1 woman (``other'' set to missing) & Woman & 873\\
+\var{vek} & 3 = 35--44, 4 = 45--54, 5 = 55--64, 6 = 65 and more (codes 1--2 not observed) & Older & 665\\
+\var{kar\_praxe} & 1 less than 5 years, 2 = 5--9, 3 = 10--19, 4 = 20 and more & More years in research & 878\\
+\var{kar\_titul} & 3 CSc./Ph.D., 4 associate professor (Docent), 5 DrSc./DSc., 6 professor (codes 1--2 not observed) & Higher degree & 767\\
+\var{kar\_citace} & 1 up to 100, 2 up to 500, 3 up to 1000, 4 up to 5000, 5 more & More citations & 878\\
+\var{kar\_nejlepsi} & 1 no, 2 yes & Published in a top journal & 878\\
+\end{longtable}
+}
+
+
+\paragraph{Exclusions.}
+Free-text items and the nominal variable giving the Academy of Sciences category (\var{kar\_kategorie}) were not included. The item \var{frek\_hacking} (p-hacking) has 494 missing values out of 878 (56\%) and was left out of FREQ. Including it reduced the number of respondents with complete data in that group from 582 to 322 and did not change the number of retained components.
+
+\paragraph{Recoding of CORE.}
+All CORE items were coded so that higher values mean a greater problem with reproducibility. For \var{krize\_rep} the four answers were ordered as: no crisis (1), don't know (2), insignificant crisis (3), significant crisis (4). Treating ``don't know'' as a point between ``no crisis'' and ``insignificant crisis'', and not as missing, is supported by two observations. First, among respondents who had not heard of the reproducibility crisis, the ratio of those unaware to those aware was almost identical for ``don't know'' (141/77 $\approx$ 1.83) and ``no crisis'' (60/33 $\approx$ 1.82), and much lower for the two ``yes'' answers. Second, the mean ratings of three related items changed monotonically along the four categories, with ``don't know'' lying between ``insignificant crisis'' and ``no crisis'' (Table~\ref{tab:dontknow}).
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{@{}l c c c@{}}
+\toprule
+\var{krize\_rep} & \var{rep\_podil} & \var{nerep\_problem} & \var{nerep\_narust}\\
+\midrule
+Yes, significant crisis   & 6.76 & 3.82 & 3.62\\
+Yes, insignificant crisis & 7.91 & 2.83 & 3.13\\
+Don't know                & 8.20 & 2.59 & 2.88\\
+No crisis                 & 8.79 & 2.02 & 2.52\\
+\bottomrule
+\end{tabular}
+\caption{Mean ratings of three related items by answer to \var{krize\_rep}. The table was computed before \var{rep\_podil} was reversed, so for \var{rep\_podil} a higher code means a larger estimated share of reproducible results; for the other two items a higher code means stronger agreement.}
+\label{tab:dontknow}
+\end{table}
+
+\paragraph{Coding of DEM.}
+Gender was coded as binary (0 = man, 1 = woman); five respondents who chose ``other'' were set to missing because the group was too small for analysis. Top-journal publication was coded 1 = no, 2 = yes. All other items were ordered from low to high.
+
+\section{Methods}
+
+\paragraph{Correlations.}
+For each group, a correlation matrix of the integer-coded items was computed with pairwise deletion of missing values. Polychoric correlations were used (tetrachoric for binary items). For groups containing an item with more than eight categories (FREQ and CORE, with 11-point items) polychoric correlations are not appropriate, and Spearman correlations were used instead. The matrix was smoothed to the nearest positive definite matrix when needed. Results for groups based on different correlation types are therefore not strictly comparable.
+
+\paragraph{PCA.}
+PCA was computed from the eigendecomposition of the correlation matrix, so that all items are standardised. The sign of each component was fixed so that its largest absolute loading is positive. Component scores are defined only for respondents with no missing item in the group.
+
+\paragraph{Number of components.}
+The number of components was assessed by parallel analysis \citep{horn1965}, which compares the observed eigenvalues with the mean eigenvalues of 500 random data sets of the same size (fixed random seed), retaining components while the observed eigenvalue exceeds the random one. The sample size used for the random data was the number of respondents with complete data in the group, but not less than $N/2=439$; this lower bound applies only to FACTORS (343 complete cases). The Kaiser criterion (eigenvalue $>1$) was not used, because it is known to retain too many components \citep{zwick1986}. A cumulative-variance threshold was also rejected: 90\% of the variance required 12 of 14 components in FACTORS, 8 of 10 in FIELD and 6 of 7 in FREQ, since the items are only moderately correlated.
+
+\paragraph{Rotation.}
+Two components were rotated by varimax to obtain a simple structure in which each item loads mainly on one component. Rotation changes how the explained variance is divided between the components, but not the total explained by the two. As a sensitivity analysis, an oblique rotation (oblimin) of the same correlation matrix was computed, which allows the two components to be correlated; the correlation between them is reported in Section~\ref{sec:phi}. With correlated components the per-component variance shares overlap and are not additive, so the total variance explained is taken from the unrotated solution.
+
+\paragraph{Split-half stability.}
+The respondents were randomly split into two halves 500 times. In each split the two-component varimax solution was computed in both halves, and the loadings were compared using Tucker's congruence coefficient, matching the components between halves (axes may swap) and ignoring sign. Values of 0.85--0.94 are conventionally read as fair similarity and 0.95 or more as equality of components \citep{lorenzo2006}. Comparing the halves with each other, and not with the full sample, avoids overlap between the compared solutions.
+
+\section{Results}
+
+\subsection{Summary}
+
+Table~\ref{tab:summary} gives the retention results and Table~\ref{tab:dims} the interpretation of the rotated components. The percentages of variance are for the two components together; the first three eigenvalues of every group, observed and random, are in Appendix~\ref{app:eig} and all loadings in Appendix~\ref{app:load}.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{@{}l c c c c L{4.6cm}@{}}
+\toprule
+Group & Items & \shortstack{Parallel\\analysis} & \shortstack{2nd eigenvalue\\(obs.\ / random)} & \shortstack{Variance,\\2 comp.} & Evidence for a second dimension\\
+\midrule
+FACTORS & 14 & 2 & 1.62 / 1.24 & 34.8\% & Strong\\
+FIELD   & 10 & 1 & 1.09 / 1.14 & 49.6\% & Good: borderline eigenvalue, clear content\\
+DEM     & 6  & 1 & 1.02 / 1.07 & 75.3\% & Moderate: second axis dominated by top-journal publication and gender\\
+CORE    & 5  & 1 & 0.87 / 1.05 & 67.6\% & Moderate: weak eigenvalue, content follows item wording\\
+FREQ    & 7  & 1 & 0.85 / 1.09 & 64.9\% & Weak: second axis is a single item\\
+NOREP   & 3  & 1 & 0.43 / 1.00 & 87.9\% & Weak: only three items, unstable\\
+\bottomrule
+\end{tabular}
+\caption{Number of components and strength of the evidence for a second dimension.}
+\label{tab:summary}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{@{}l L{5.8cm} L{5.8cm}@{}}
+\toprule
+Group & RC1 & RC2\\
+\midrule
+FACTORS & Flaws in the original research: misconduct, weak oversight and review, selective reporting, withheld data and code & Intrinsic difficulty: bad luck, reagent variability, methods requiring special expertise, errors by replicators\\[4pt]
+FIELD & Hyper-competitive, fast-growing field: pressure for results, publication growth, competition, rapid obsolescence, complexity & Visible, publicly funded field: public opinion, media exposure, subsidies, influx of researchers, field size\\[4pt]
+DEM & Seniority: age, years in research, degree, citations & Publication success: top-journal publication and citations, associated with male gender\\[4pt]
+CORE & General recognition of the crisis: awareness, belief that it exists, increase during the career & Severity of the problem in one's own field: estimated reproducible share, seriousness\\[4pt]
+FREQ & Author-level practices: overselling, unjustified generalisation, trendy methods, buzzwords, pointless studies, salami slicing & \var{frek\_positiv} (publication of positive results only) alone\\[4pt]
+NOREP & Others failing to reproduce my results & Me failing to reproduce others' work; failing to reproduce my own loads on both\\
+\bottomrule
+\end{tabular}
+\caption{Interpretation of the varimax-rotated components.}
+\label{tab:dims}
+\end{table}
+
+\subsection{Correlation between components}
+\label{sec:phi}
+
+Table~\ref{tab:phi} gives the correlation between the two components after oblique rotation. A correlation of about 0.32 or more (10\% shared variance) is commonly taken as a reason to prefer an oblique solution \citep{tabachnick2013}.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{@{}l c c L{6.2cm}@{}}
+\toprule
+Group & Correlation & Shared variance & Reading\\
+\midrule
+FACTORS & 0.10 & 1\%  & Essentially independent; varimax is fully justified\\
+FIELD   & 0.39 & 15\% & Moderate: related but distinct\\
+CORE    & 0.35 & 13\% & Moderate\\
+DEM     & 0.36 & 13\% & Moderate\\
+FREQ    & 0.34 & 11\% & Moderate; the second component is a single item\\
+NOREP   & 0.58 & 34\% & High: supports a single dimension\\
+\bottomrule
+\end{tabular}
+\caption{Correlation between the two components after oblimin rotation.}
+\label{tab:phi}
+\end{table}
+
+With the exception of NOREP, the correlations lie between 0.10 and 0.39, so the second components are related to the first but carry mostly their own information. The oblique loadings assign the items to the same components as varimax in all six groups (Appendix~\ref{app:load}). In FREQ the second component is the single item \var{frek\_positiv} (loading 0.96), and in NOREP the two components are essentially the single items \var{nerep\_oniMuj} (0.99) and \var{nerep\_jaCizi} (0.98), with \var{nerep\_jaMuj} between them. Such components are individual items, not dimensions, and for NOREP the correlation of 0.58 mainly describes how strongly these two items are related.
+
+\subsection{Interpretation by group}
+
+\paragraph{FACTORS.} The first component (22.3\%) collects explanations that blame the original research and the system around it: fraud, selective reporting, withheld data and protocols, insufficient supervision and peer review, career pressure, poor design and weak statistics. The second (12.6\%) collects explanations that do not blame the original authors: bad luck, reagent variability, methods needing special expertise, and errors by those who replicate. Replicator errors and poor design load on both components. Parallel analysis supports two components, and the near-zero correlation between the components (0.10) shows that the two kinds of explanation are almost independent.
+
+\paragraph{FIELD.} The first component (26.2\%) describes a competitive, fast-growing field with strong pressure on results. The second (23.4\%) describes a field in the public eye, with media exposure, influence of public opinion, and high funding. This is the clearest second dimension outside FACTORS; the second eigenvalue is only 0.04 below the random benchmark (1.09 against 1.14).
+
+\paragraph{DEM.} The first component (47.7\%) is seniority. The second (27.6\%) is defined by top-journal publication and, less strongly, citations, together with male gender: in this sample men are more often top-journal authors. Gender also correlates with the seniority component (about $-0.38$ in the oblique structure matrix, women being less senior), so the gender gap is partly a seniority effect. The component is dominated by two binary items, and we report it as an association between these items and citations, not as a latent construct.
+
+\paragraph{CORE.} After recoding so that higher values always mean a greater problem, all loadings are positive. The first component (35.5\%) is general recognition of the crisis (awareness, belief that it exists, increase during the career). The second (32.1\%) is the assessment of the problem in the respondent's own field (estimated reproducible share, seriousness). The distinction follows the wording of the questions, which is stronger support than the eigenvalue pattern, where the second eigenvalue (0.87) lies clearly below the random benchmark (1.05).
+
+\paragraph{FREQ.} All practices except one load on the first component (47.6\%). The second (17.3\%) is the single item \var{frek\_positiv}, which means that this item is weakly related to the others. We interpret this as perceived publication bias being separate from author-level practices, and report it as an item, not as a dimension.
+
+\paragraph{NOREP.} Three binary items give a two-component solution (46.8\% and 41.1\% after rotation) that follows the roles of the respondent (being replicated or replicating). With three items such a split is almost guaranteed, and the second eigenvalue is far below the random benchmark (0.43 against 1.00). In the oblique solution the two components are almost single items (loadings 0.98--0.99) correlated at 0.58. We do not treat it as evidence of two dimensions.
+
+\subsection{Split-half stability}
+
+Table~\ref{tab:split} shows the stability of the two varimax components in random split-half comparisons.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{@{}l c c c c c@{}}
+\toprule
+ & \multicolumn{2}{c}{RC1} & \multicolumn{3}{c}{RC2}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-6}
+Group & Median & 2.5\% quantile & Median & 2.5\% quantile & Splits $\geq 0.85$\\
+\midrule
+FACTORS & \multicolumn{5}{c}{not available (computation failed; to be added)}\\
+FIELD & 0.96 & 0.86 & 0.96 & 0.80 & 97\%\\
+CORE  & 0.97 & 0.85 & 0.97 & 0.83 & 97\%\\
+DEM   & 0.99 & 0.96 & 0.98 & 0.86 & 98\%\\
+FREQ  & 1.00 & 0.99 & 0.95 & 0.84 & 97\%\\
+NOREP & 0.90 & 0.81 & 0.90 & 0.54 & 85\%\\
+\bottomrule
+\end{tabular}
+\caption{Split-half congruence (Tucker's coefficient) of the varimax components in 500 random splits. No split failed in the groups shown.}
+\label{tab:split}
+\end{table}
+
+In FIELD, CORE and DEM the typical congruence is 0.96--0.98. In about 3\% of the splits the second component of FIELD and CORE falls below the 0.85 guideline (the 2.5\% quantile is 0.80 and 0.83), while in DEM the 2.5\% quantile stays above 0.85. The second component of FREQ, which is a single item, is also stable (median 0.95), so stability alone does not make a component a dimension. NOREP is clearly less stable (RC2: median 0.90, 2.5\% quantile 0.54, 85\% of splits at or above 0.85), which agrees with treating its second component as an artefact of having only three items. Each half contains only half of the respondents, so these values understate the stability of the full-sample solutions. The congruences of RC1 and RC2 are similar because two orthogonal varimax axes in one plane rotate together. The check therefore supports the stability of the two-dimensional solution as a whole, and not the second axis separately.
+
+\section{Conclusion}
+
+\begin{enumerate}
+\item \textbf{FACTORS.} Two components are supported by parallel analysis, interpretability and structure. Respondents distinguish attributing irreproducibility to flaws in the original research and its system from attributing it to intrinsic difficulty and chance, and the two views are almost uncorrelated ($r=0.10$).
+\item \textbf{FIELD, CORE and DEM.} Parallel analysis suggested one component, but the second eigenvalue was borderline (FIELD, DEM) or clearly below (CORE) the random benchmark. We retain two components because the rotated solutions are interpretable, follow the content of the items, and recur in random split-half comparisons; the components are moderately correlated ($r=0.35$--$0.39$). Because retaining too few components is generally regarded as the more serious error \citep{fabrigar1999}, and interpretability is a recognised criterion in addition to the eigenvalue rule, we regard this as a justified departure from the parallel-analysis count. In DEM, the second component is dominated by two binary items (top-journal publication and gender) and citations, and in CORE its support rests largely on the wording of the questions.
+\item \textbf{FREQ and NOREP.} The evidence for a second dimension is weak. We describe FREQ by one general component plus the separate item \var{frek\_positiv}, and NOREP by one component with the three items reported individually. The oblique solutions confirm that the second component of FREQ, and both components of NOREP, are essentially single items (loadings 0.96--0.99), and the split-half check shows that the NOREP solution is unstable.
+\item \textbf{General.} Between 35\% and 88\% of the variance is explained by two components, depending on the group, and the share is low where items are only moderately correlated (FACTORS). The components are summaries of the items, not measured constructs, and for the groups with a borderline second eigenvalue both the one-component and the two-component description should be reported.
+\end{enumerate}
+
+\section{Limitations}
+
+\begin{itemize}
+\item The analysis is exploratory and was done on a single sample. Retention of components that parallel analysis does not support was decided on interpretability, which is a judgement.
+\item Parallel analysis was run on component eigenvalues. It may perform worse with small item sets, binary items and substantial missing data, which describes several of these groups \citep{tran2009}.
+\item Missing data are substantial: the number of valid answers per item ranges from 515 to 878, and complete cases per group from 343 (FACTORS) to 700 (CORE). Pairwise deletion means that different correlations rest on different respondents, and some matrices needed smoothing. In NOREP, answers ``I do not do experiments'' and ``I do not remember'' were treated as missing, so the missingness is structural. Component scores exist only for respondents with no missing item.
+\item ``Don't know'' (FIELD) and ``neutral'' (CORE) were treated as the midpoint of the scale, as was ``don't know'' for \var{krize\_rep}, where this was checked (Table~\ref{tab:dontknow}).
+\item Age, academic degree and pressure on results (\var{obor\_tlak}) have no observations in the two lowest categories of their scales (Table~\ref{tab:scales}), which restricts their range.
+% CHECK: confirm in the raw data whether codes 1-2 of vek, kar_titul and obor_tlak are truly absent or were lost as NA during processing.
+\item Two groups (FREQ and CORE) use Spearman correlations and the others polychoric, so the numbers are not strictly comparable between groups.
+\item Varimax forces uncorrelated components. An oblique (oblimin) rotation showed correlations between the components of 0.34--0.39 in four groups, 0.10 in FACTORS and 0.58 in NOREP, so the varimax solution slightly exaggerates the separation of the two components in most groups. The stability check was run on the varimax solution only and could not be obtained for FACTORS.
+\end{itemize}
+
+% Optional: include the figures produced by PCA.analysis(), e.g.
+% \begin{figure}[ht]\centering
+%   \includegraphics[width=0.8\textwidth]{figures/PCA-scree-eigen-FIELD.pdf}
+%   \caption{Eigenvalue scree plot with parallel analysis, group FIELD.}
+% \end{figure}
+
+\begin{thebibliography}{9}
+\bibitem[Fabrigar et~al.(1999)]{fabrigar1999}
+Fabrigar, L.~R., Wegener, D.~T., MacCallum, R.~C., and Strahan, E.~J. (1999).
+Evaluating the use of exploratory factor analysis in psychological research.
+\emph{Psychological Methods}, 4(3), 272--299.
+
+\bibitem[Horn(1965)]{horn1965}
+Horn, J.~L. (1965).
+A rationale and test for the number of factors in factor analysis.
+\emph{Psychometrika}, 30(2), 179--185.
+
+\bibitem[Lorenzo-Seva and ten Berge(2006)]{lorenzo2006}
+Lorenzo-Seva, U. and ten Berge, J.~M.~F. (2006).
+Tucker's congruence coefficient as a meaningful index of factor similarity.
+\emph{Methodology}, 2(2), 57--64.
+
+\bibitem[Tabachnick and Fidell(2013)]{tabachnick2013}
+Tabachnick, B.~G. and Fidell, L.~S. (2013).
+\emph{Using Multivariate Statistics} (6th ed.). Pearson.
+
+\bibitem[Tran and Formann(2009)]{tran2009}
+Tran, U.~S. and Formann, A.~K. (2009).
+Performance of parallel analysis in retrieving unidimensionality in the presence of binary data.
+\emph{Educational and Psychological Measurement}, 69, 50--61.
+
+\bibitem[Zwick and Velicer(1986)]{zwick1986}
+Zwick, W.~R. and Velicer, W.~F. (1986).
+Comparison of five rules for determining the number of components to retain.
+\emph{Psychological Bulletin}, 99(3), 432--442.
+\end{thebibliography}
+
+\appendix
+
+\section{Loadings}\label{app:load}
+
+Tables~\ref{tab:app-FACTORS}--\ref{tab:app-NOREP} give, for every group, the varimax loadings and the oblimin pattern loadings of the two components. The oblimin components are numbered to match the varimax components, because the item pattern is the same in all groups. Loadings of 0.40 or more are in bold and loadings below 0.20 in grey. The last rows give the variance explained by the rotated components (varimax) and the correlation between the oblimin components; with correlated components the oblique variance shares are not additive and are not reported. Items are listed in the order of the data file.
+
+\begin{table}[ht]
+\centering\small
+\begin{tabular}{@{}L{8.4cm} r r r r@{}}
+\toprule
+ & \multicolumn{2}{c}{Varimax} & \multicolumn{2}{c}{Oblimin (pattern)}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Item & RC1 & RC2 & 1 & 2\\
+\midrule
+Fraud (\var{fakt\_podvod}) & \textbf{0.57} & 0.21 & \textbf{0.56} & \textcolor{gray}{0.17}\\
+Career pressure to publish (\var{fakt\_karier}) & \textbf{0.52} & \textcolor{gray}{0.06} & \textbf{0.52} & \textcolor{gray}{0.03}\\
+Insufficient supervision by the lab head (\var{fakt\_dohled}) & \textbf{0.53} & 0.25 & \textbf{0.52} & 0.21\\
+Insufficient peer review (\var{fakt\_recenz}) & \textbf{0.51} & \textcolor{gray}{$-$0.08} & \textbf{0.52} & \textcolor{gray}{$-$0.12}\\
+Selective reporting (\var{fakt\_selekc}) & \textbf{0.62} & \textcolor{gray}{$-$0.06} & \textbf{0.63} & \textcolor{gray}{$-$0.10}\\
+Original results not replicated in the originating lab (\var{fakt\_replik}) & \textbf{0.48} & \textcolor{gray}{0.18} & \textbf{0.47} & \textcolor{gray}{0.15}\\
+Low power or inadequate statistics in the original study (\var{fakt\_statis}) & \textbf{0.46} & \textcolor{gray}{0.07} & \textbf{0.46} & \textcolor{gray}{0.04}\\
+Errors or lack of expertise of those who reproduce (\var{fakt\_odborn}) & 0.36 & \textbf{0.51} & 0.35 & \textbf{0.49}\\
+Original data not provided (\var{fakt\_data}) & \textbf{0.63} & \textcolor{gray}{$-$0.12} & \textbf{0.63} & \textcolor{gray}{$-$0.16}\\
+Protocols or code not provided or insufficient (\var{fakt\_dokume}) & \textbf{0.63} & \textcolor{gray}{$-$0.12} & \textbf{0.63} & \textcolor{gray}{$-$0.16}\\
+Methods require special expertise (\var{fakt\_metody}) & \textcolor{gray}{0.06} & \textbf{0.64} & \textcolor{gray}{0.04} & \textbf{0.64}\\
+Variability of reagents (\var{fakt\_variab}) & \textcolor{gray}{$-$0.03} & \textbf{0.59} & \textcolor{gray}{$-$0.05} & \textbf{0.59}\\
+Poor experimental design (\var{fakt\_design}) & \textbf{0.47} & 0.34 & \textbf{0.46} & 0.31\\
+Bad luck (unfortunate coincidence) (\var{fakt\_smula}) & \textcolor{gray}{$-$0.12} & \textbf{0.67} & \textcolor{gray}{$-$0.14} & \textbf{0.68}\\
+\midrule
+Variance explained (\%) & 22.3 & 12.6 & \multicolumn{2}{c}{}\\
+Correlation of the components & \multicolumn{2}{c}{} & \multicolumn{2}{c}{0.10}\\
+\bottomrule
+\end{tabular}
+\caption{Loadings, group FACTORS (14 items, polychoric correlations, 343 respondents with complete data).}
+\label{tab:app-FACTORS}
+\end{table}
+
+\begin{table}[ht]
+\centering\small
+\begin{tabular}{@{}L{8.4cm} r r r r@{}}
+\toprule
+ & \multicolumn{2}{c}{Varimax} & \multicolumn{2}{c}{Oblimin (pattern)}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Item & RC1 & RC2 & 1 & 2\\
+\midrule
+Highly funded field (\var{obor\_dotovany}) & 0.31 & \textbf{0.59} & \textcolor{gray}{0.17} & \textbf{0.58}\\
+Strong competition (\var{obor\_konkuren}) & \textbf{0.68} & 0.38 & \textbf{0.62} & 0.30\\
+Extreme pressure for results (\var{obor\_tlak}) & \textbf{0.79} & \textcolor{gray}{$-$0.09} & \textbf{0.85} & $-$0.21\\
+Knowledge becomes obsolete quickly (\var{obor\_rychly}) & \textbf{0.54} & 0.32 & \textbf{0.48} & 0.26\\
+Rapid influx of researchers (\var{obor\_priliv}) & \textbf{0.53} & \textbf{0.51} & \textbf{0.42} & \textbf{0.47}\\
+Rapidly growing number of publications (\var{obor\_publikac}) & \textbf{0.70} & 0.32 & \textbf{0.65} & 0.23\\
+Results often presented in the media (\var{obor\_medializ}) & 0.31 & \textbf{0.70} & \textcolor{gray}{0.13} & \textbf{0.71}\\
+Strongly influenced by public opinion (\var{obor\_verejnos}) & \textcolor{gray}{0.10} & \textbf{0.72} & \textcolor{gray}{$-$0.09} & \textbf{0.76}\\
+Studies highly complex phenomena (\var{obor\_komplexn}) & \textbf{0.51} & \textcolor{gray}{0.09} & \textbf{0.52} & \textcolor{gray}{0.01}\\
+Larger field (reverse of item 48) (\var{obor\_vetsi}) & \textcolor{gray}{0.01} & \textbf{0.60} & \textcolor{gray}{$-$0.15} & \textbf{0.65}\\
+\midrule
+Variance explained (\%) & 26.2 & 23.4 & \multicolumn{2}{c}{}\\
+Correlation of the components & \multicolumn{2}{c}{} & \multicolumn{2}{c}{0.39}\\
+\bottomrule
+\end{tabular}
+\caption{Loadings, group FIELD (10 items, polychoric correlations, 661 respondents with complete data).}
+\label{tab:app-FIELD}
+\end{table}
+
+\begin{table}[ht]
+\centering\small
+\begin{tabular}{@{}L{8.4cm} r r r r@{}}
+\toprule
+ & \multicolumn{2}{c}{Varimax} & \multicolumn{2}{c}{Oblimin (pattern)}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Item & RC1 & RC2 & 1 & 2\\
+\midrule
+Estimated share of non-reproducible results (\var{rep\_podil}) & \textcolor{gray}{0.09} & \textbf{0.86} & \textcolor{gray}{$-$0.10} & \textbf{0.90}\\
+A reproducibility crisis exists (own view) (\var{krize\_rep}) & \textbf{0.77} & 0.37 & \textbf{0.73} & 0.25\\
+Irreproducibility is a serious problem in my field (\var{nerep\_problem}) & 0.34 & \textbf{0.78} & \textcolor{gray}{0.19} & \textbf{0.76}\\
+Irreproducible share increased during my career (\var{nerep\_narust}) & \textbf{0.54} & 0.35 & \textbf{0.49} & 0.27\\
+Has heard of the reproducibility crisis (\var{rep\_type}) & \textbf{0.88} & \textcolor{gray}{0.01} & \textbf{0.91} & \textcolor{gray}{$-$0.13}\\
+\midrule
+Variance explained (\%) & 35.5 & 32.1 & \multicolumn{2}{c}{}\\
+Correlation of the components & \multicolumn{2}{c}{} & \multicolumn{2}{c}{0.35}\\
+\bottomrule
+\end{tabular}
+\caption{Loadings, group CORE (5 items, Spearman correlations, 700 respondents with complete data).}
+\label{tab:app-CORE}
+\end{table}
+
+\begin{table}[ht]
+\centering\small
+\begin{tabular}{@{}L{8.4cm} r r r r@{}}
+\toprule
+ & \multicolumn{2}{c}{Varimax} & \multicolumn{2}{c}{Oblimin (pattern)}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Item & RC1 & RC2 & 1 & 2\\
+\midrule
+Gender (0 man, 1 woman) (\var{gender}) & $-$0.25 & \textbf{$-$0.67} & \textcolor{gray}{$-$0.15} & \textbf{$-$0.65}\\
+Age (\var{vek}) & \textbf{0.93} & \textcolor{gray}{0.05} & \textbf{0.97} & \textcolor{gray}{$-$0.16}\\
+Years in research (\var{kar\_praxe}) & \textbf{0.93} & 0.26 & \textbf{0.95} & \textcolor{gray}{0.06}\\
+Academic degree (\var{kar\_titul}) & \textbf{0.82} & 0.26 & \textbf{0.82} & \textcolor{gray}{0.09}\\
+Citations (estimate) (\var{kar\_citace}) & \textbf{0.63} & \textbf{0.59} & \textbf{0.57} & \textbf{0.47}\\
+Published in a top journal (\var{kar\_nejlepsi}) & \textcolor{gray}{0.05} & \textbf{0.85} & \textcolor{gray}{$-$0.08} & \textbf{0.88}\\
+\midrule
+Variance explained (\%) & 47.7 & 27.6 & \multicolumn{2}{c}{}\\
+Correlation of the components & \multicolumn{2}{c}{} & \multicolumn{2}{c}{0.36}\\
+\bottomrule
+\end{tabular}
+\caption{Loadings, group DEM (6 items, polychoric correlations, 646 respondents with complete data).}
+\label{tab:app-DEM}
+\end{table}
+
+\begin{table}[ht]
+\centering\small
+\begin{tabular}{@{}L{8.4cm} r r r r@{}}
+\toprule
+ & \multicolumn{2}{c}{Varimax} & \multicolumn{2}{c}{Oblimin (pattern)}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Item & RC1 & RC2 & 1 & 2\\
+\midrule
+Unjustified generalisation of results (\var{frek\_nerepre}) & \textbf{0.73} & 0.30 & \textbf{0.72} & \textcolor{gray}{0.15}\\
+Publishing only positive or significant results (\var{frek\_positiv}) & \textcolor{gray}{0.15} & \textbf{0.96} & \textcolor{gray}{0.03} & \textbf{0.96}\\
+Inserting ``popular'' terms to improve publishability (\var{frek\_popular}) & \textbf{0.71} & \textcolor{gray}{0.17} & \textbf{0.73} & \textcolor{gray}{0.01}\\
+Fashionable methods without scientific justification (\var{frek\_modmet}) & \textbf{0.77} & 0.23 & \textbf{0.78} & \textcolor{gray}{0.07}\\
+Deliberate overselling of results (\var{frek\_oversell}) & \textbf{0.74} & 0.33 & \textbf{0.73} & \textcolor{gray}{0.18}\\
+Publishing pointless studies (\var{frek\_zbytecne}) & \textbf{0.75} & \textcolor{gray}{0.11} & \textbf{0.78} & \textcolor{gray}{$-$0.05}\\
+Salami slicing (\var{frek\_salam}) & \textbf{0.76} & \textcolor{gray}{$-$0.05} & \textbf{0.81} & $-$0.22\\
+\midrule
+Variance explained (\%) & 47.6 & 17.3 & \multicolumn{2}{c}{}\\
+Correlation of the components & \multicolumn{2}{c}{} & \multicolumn{2}{c}{0.34}\\
+\bottomrule
+\end{tabular}
+\caption{Loadings, group FREQ (7 items, Spearman correlations, 582 respondents with complete data).}
+\label{tab:app-FREQ}
+\end{table}
+
+\begin{table}[ht]
+\centering\small
+\begin{tabular}{@{}L{8.4cm} r r r r@{}}
+\toprule
+ & \multicolumn{2}{c}{Varimax} & \multicolumn{2}{c}{Oblimin (pattern)}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Item & RC1 & RC2 & 1 & 2\\
+\midrule
+Failed to replicate my own experiment (\var{nerep\_jaMuj}) & \textbf{0.68} & \textbf{0.55} & \textbf{0.60} & 0.38\\
+Failed to replicate someone else's experiment (\var{nerep\_jaCizi}) & 0.29 & \textbf{0.93} & \textcolor{gray}{$-$0.00} & \textbf{0.98}\\
+Others failed to reproduce a result of mine (\var{nerep\_oniMuj}) & \textbf{0.92} & 0.25 & \textbf{0.99} & \textcolor{gray}{$-$0.05}\\
+\midrule
+Variance explained (\%) & 46.8 & 41.1 & \multicolumn{2}{c}{}\\
+Correlation of the components & \multicolumn{2}{c}{} & \multicolumn{2}{c}{0.58}\\
+\bottomrule
+\end{tabular}
+\caption{Loadings, group NOREP (3 items, polychoric correlations, 451 respondents with complete data).}
+\label{tab:app-NOREP}
+\end{table}
+
+\section{Eigenvalues and parallel analysis}\label{app:eig}
+
+Table~\ref{tab:app-eig} gives the first three eigenvalues of the observed correlation matrix and the mean eigenvalues of 500 random data sets of the same size (parallel analysis), the number of components retained by parallel analysis, and the number of components needed to reach 90\% of the variance.
+
+\begin{table}[ht]
+\centering\small
+\begin{tabular}{@{}l r r r r r r c c@{}}
+\toprule
+ & \multicolumn{2}{c}{1st} & \multicolumn{2}{c}{2nd} & \multicolumn{2}{c}{3rd} & & \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+Group & obs. & rand. & obs. & rand. & obs. & rand. & \shortstack{Parallel\\analysis} & \shortstack{90\%\\variance}\\
+\midrule
+FACTORS & 3.26 & 1.31 & 1.62 & 1.24 & 1.15 & 1.18 & 2 & 12\\
+FIELD & 3.87 & 1.20 & 1.09 & 1.14 & 0.93 & 1.09 & 1 & 8\\
+CORE & 2.51 & 1.11 & 0.87 & 1.05 & 0.76 & 1.00 & 1 & 4\\
+DEM & 3.50 & 1.13 & 1.02 & 1.07 & 0.73 & 1.02 & 1 & 4\\
+FREQ & 3.69 & 1.16 & 0.85 & 1.09 & 0.65 & 1.04 & 1 & 6\\
+NOREP & 2.21 & 1.08 & 0.43 & 1.00 & 0.36 & 0.92 & 1 & 3\\
+\bottomrule
+\end{tabular}
+\caption{Observed and random-data eigenvalues. The last column is the number of components needed for 90\% of the variance.}
+\label{tab:app-eig}
+\end{table}
+
+\end{document}

@@ -276,7 +276,6 @@ my$rep_podil <- factor(as.character(my$rep_podil),
 likert.vars <- c(
 "obor_dotovany",
 "obor_konkuren",
-"obor_tlak",
 "obor_rychly",
 "obor_priliv",
 "obor_publikac",
@@ -284,13 +283,21 @@ likert.vars <- c(
 "obor_verejnos",
 "obor_komplexn",
 "obor_mensi",
+"obor_tlak",
 "obor_ekzaktnost"
 )
-for (i in 1:(length(likert.vars)-1)){
+
+for (i in 1:(length(likert.vars)-2)){
   my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
                                   levels = c("Rozhodně ne", "Spíše ne", "Nevím", "Spíše ano", "Rozhodně ano"))
 }
-# the last Likert variable has different states
+
+#  the last but one Likert variable obor_tlak has different states than in the orignal data
+i <- length(likert.vars)-1
+my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
+                                  levels = c("Ne (rozhodně/spíše)", "Nevím", "Spíše ano", "Rozhodně ano"))
+
+# the last Likert variable obor_ekzaktnost has different states
 i <- length(likert.vars)
 my[[likert.vars[i]]] <- ordered(my[[likert.vars[i]]], 
                                   levels = c("„Měkčí“ (méně exaktní)", "Nedokážu posoudit", "„Tvrdší“ (exaktnější)"))
@@ -320,12 +327,15 @@ ordinal.vars <- c(
 "cinnost_kateg",
 "cinnost_vyvoj")
 # u ordinálních veličin musíme správně nastavit uspořádání jejich hodnot
+
+# the variable vek has joined two first ranges to one, i.e. to "18–34"
 my[[ordinal.vars[1]]] <- ordered(my[[ordinal.vars[1]]], 
-                                  levels = c("18–24","25–34","35–44","45–54","55–64","65 a více"))
+                                  levels = c("18–34","35–44","45–54","55–64","65 a více"))
 my[[ordinal.vars[2]]] <- ordered(my[[ordinal.vars[2]]], 
                                   levels = c("Méně než 5 let","5–9 let","10–19 let","20 a více let"))
+# "Bc./Mgr./Ing." is used instead of independent "Bc." and "Mgr./Ing."
 my[[ordinal.vars[3]]] <- ordered(my[[ordinal.vars[3]]], 
-                                  levels = c("Bc.","Mgr./Ing.","CSc./Ph.D.","Docent","DrSc./DSc.","Profesor"))
+                                  levels = c("Bc./Mgr./Ing.","CSc./Ph.D.","Docent","DrSc./DSc.","Profesor"))
 my[[ordinal.vars[4]]] <- ordered(my[[ordinal.vars[4]]], 
                                   levels = c("Do 100","Do 500","Do 1000","Do 5000","Více"))
 for (i in 5:6){
@@ -477,12 +487,32 @@ my.vars$krize_rep <- 5 - my.vars$krize_rep   # 1 = no crisis, 2 = don't know, 3 
 # Percentage of Reproducible Results swapped to Percentage of Non-Reproducible Results
 my.vars$rep_podil <- 12 - my.vars$rep_podil # 1 = all reproducible results, ... , 11 ... all non-reproducible results
 
+my.vars$kar_nejlepsi <- 3 - my.vars$kar_nejlepsi    # 1 = Ne, 2 = Ano
+my.vars$gender <- ifelse(my.vars$gender == 2, NA,
+                         ifelse(my.vars$gender == 3, 1, 0))   # 0 = Muž, 1 = Žena, Ostatní -> NA
+
 ```
 
 PCA analysis for the groups using the dataset "my.vars"
 
 ```{r}
-SPLIT.ANALYSIS <- FALSE
+  source("report_numbers.R")
+```
+
+Regression with PCA results
+
+```{r}
+source("regression_CORE.R")
+```
+
+
+
+
+
+
+```{r}
+# SPLIT.ANALYSIS <- FALSE
+SPLIT.ANALYSIS <- TRUE
 results <- PCA.analysis(my.vars, groups)
 if (SPLIT.ANALYSIS){
   source("split_half_congruence.R")
@@ -491,6 +521,24 @@ if (SPLIT.ANALYSIS){
   lapply(sh, `[[`, "summary")
 }
 ```
+
+Oblique rotation:
+PCA gives uncorrelated components by construction. Varimax is an orthogonal rotation, so it keeps the two rotated components uncorrelated. When you see RC1 and RC2 uncorrelated in the output, that is something the method imposes, not something the data show. The constraint can also bend the solution. If two clusters of items correspond to constructs that are related in reality (people who see misconduct as a cause also tend to see chance as a cause), forcing the axes to be perpendicular makes them point slightly away from the clusters. Loadings then look a bit messier, and some cross-loadings (like fakt_odborn and fakt_design in FACTORS) can come from this. An oblique rotation (oblimin or promax) drops the constraint. The axes can point straight through the clusters, and the correlation between components becomes a result that you can read.
+
+```{r}
+oblique_check <- function(dat) {
+  rng <- diff(range(as.matrix(dat), na.rm = TRUE)) + 1
+  R <- if (rng > 8) cor(dat, method = "spearman", use = "pairwise.complete.obs")
+       else suppressWarnings(polychoric(dat, global = FALSE)$rho)
+  principal(cor.smooth(R), nfactors = 2, rotate = "oblimin")
+}
+ob <- lapply(groups[c("FACTORS", "FIELD", "NOREP", "CORE", "DEM", "FREQ")],
+             function(cols) oblique_check(my.vars[cols]))
+lapply(ob, function(o) round(o$Phi, 2))
+for (g in names(ob)) { cat("\n", g, "\n"); print(ob[[g]]$loadings, cutoff = 0.2) }
+```
+
+
 
 Correlation matrix computation
 
