@@ -31,6 +31,7 @@
 
 suppressPackageStartupMessages({
   library(psych); library(mice); library(sandwich); library(MASS)
+  library(caret)   # for 10-fold cross-validation in step 4c
 })
 
 ## ---- 0. specification ------------------------------------------------------
@@ -205,8 +206,12 @@ cat("Gender 'other' (", sum(is.na(D0$gender)), " respondents) is set to missing 
 ## ---- fitting and pooling functions ---------------------------------------------
 fit_lm <- function(y, x, d) {                   # OLS with HC3 standard errors
   m <- lm(reformulate(x, y), data = d)
+  # AIC and BIC use the Gaussian log-likelihood at OLS residuals (same as stats::AIC/BIC).
+  # HC3 corrects the standard errors but NOT the likelihood, so AIC/BIC remain valid
+  # for comparing models on the same outcome and the same rows.
   list(est = coef(m), vcov = vcovHC(m, type = "HC3"), n = nobs(m),
-       k = length(coef(m)), r2 = summary(m)$r.squared)
+       k = length(coef(m)), r2 = summary(m)$r.squared,
+       aic = AIC(m), bic = BIC(m))
 }
 fit_item <- function(item, x, d) {              # logistic (binary) or proportional odds
   d2 <- d[, c(item, x), drop = FALSE]
@@ -417,6 +422,14 @@ writeLines(rows, file.path(out_dir, "wald_FLD_rows.tex"))
 #     The components replace the 2-component scores AND the single items of these groups
 #     (frek_positiv, gender, top_journal are items of FREQ / DEM and are part of the components).
 #     NOREP has only 3 items and keeps NOR1 + nerep_jaCizi.
+# (a2) FACTORS-only 3-component model: 3 oblimin components for FACTORS (FAC3c1--FAC3c3),
+#     all other groups exactly as in the benchmark (FLD1, FLD2, FRQ1, frek_positiv,
+#     DEM1, gender, top_journal; + NOR1, nerep_jaCizi when use_norep = TRUE).
+#     Outcomes COR1 and COR2.
+# (a3) FACTORS-only 4-component model: 4 oblimin components for FACTORS (FAC4c1--FAC4c4),
+#     all other groups exactly as in the benchmark.
+#     Outcomes COR1 and COR2. This is the focused alternative motivated by the
+#     substantively interpretable four-way split of FACTORS items.
 # (b) ONE unrotated component per predictor group (FAC0, FLD0, FRQ0, DEM0; NOR1 is already the
 #     first component of NOREP), no single items; outcomes COR0 (the one-component CORE
 #     description) and, for comparison, COR1 and COR2.
@@ -492,8 +505,59 @@ x_k <- function(k, use_norep)                    # all k components of FACTORS, 
   c(unlist(lapply(alt_groups, function(p) paste0(p, k, "c", seq_len(k))), use.names = FALSE),
     if (use_norep) c("NOR1", "nerep_jaCizi"))
 x_1 <- function(use_norep) c("FAC0", "FLD0", "FRQ0", "DEM0", if (use_norep) "NOR1")
+# FACTORS-only k-component models: k oblimin components for FACTORS, benchmark spec elsewhere.
+# FIELD: FLD1 + FLD2; FREQ: FRQ1 + frek_positiv; DEM: DEM1 + gender + top_journal.
+x_fac3 <- function(use_norep)
+  c("FAC3c1", "FAC3c2", "FAC3c3",               # 3 oblimin components of FACTORS
+    blocks$FIELD,                                 # FLD1, FLD2
+    blocks$FREQ,                                  # FRQ1, frek_positiv
+    blocks$DEM,                                   # DEM1, gender, top_journal
+    if (use_norep) blocks$NOREP)                  # NOR1, nerep_jaCizi
+x_fac4 <- function(use_norep)
+  c("FAC4c1", "FAC4c2", "FAC4c3", "FAC4c4",     # 4 oblimin components of FACTORS
+    blocks$FIELD,                                 # FLD1, FLD2
+    blocks$FREQ,                                  # FRQ1, frek_positiv
+    blocks$DEM,                                   # DEM1, gender, top_journal
+    if (use_norep) blocks$NOREP)                  # NOR1, nerep_jaCizi
 
 adj_r2 <- function(r2, n, k) 1 - (1 - r2) * (n - 1) / (n - k)   # k = number of coefficients incl. intercept
+
+## 10-fold cross-validated R^2 for one data frame.
+## Uses base R (no caret dependency at prediction time) to keep the loop fast.
+## Returns the mean and SD of fold-level R^2 (pred vs. obs on the held-out fold).
+cv10_r2 <- function(y, x, d, seed = 42) {
+  set.seed(seed)
+  d_complete <- d[complete.cases(d[, c(y, x)]), ]
+  n   <- nrow(d_complete)
+  idx <- sample(seq_len(n))
+  folds <- cut(seq_along(idx), breaks = 10, labels = FALSE)
+  r2_folds <- vapply(1:10, function(f) {
+    train <- d_complete[idx[folds != f], , drop = FALSE]
+    test  <- d_complete[idx[folds == f], , drop = FALSE]
+    m     <- lm(reformulate(x, y), data = train)
+    pred  <- predict(m, newdata = test)
+    obs   <- test[[y]]
+    ss_res <- sum((obs - pred)^2)
+    ss_tot <- sum((obs - mean(obs))^2)
+    if (ss_tot == 0) return(NA_real_)
+    1 - ss_res / ss_tot
+  }, numeric(1))
+  list(mean = mean(r2_folds, na.rm = TRUE), sd = stats::sd(r2_folds, na.rm = TRUE))
+}
+
+## Pool AIC/BIC across imputed data sets (arithmetic mean; Lydersen et al. 2010).
+## Note: this is an approximation — no between-imputation variance is propagated.
+## It is used here only for model ranking, not for inference.
+pool_aic_bic <- function(fits)
+  c(AIC_MI = mean(vapply(fits, function(f) f$aic, numeric(1))),
+    BIC_MI = mean(vapply(fits, function(f) f$bic, numeric(1))))
+
+## Pool 10-fold CV R^2 across imputed data sets (mean of per-imputation means).
+pool_cv <- function(y, x, dlist, kp, seed = 42) {
+  cv_vals <- vapply(dlist, function(d) cv10_r2(y, x, d[kp, ], seed = seed)$mean, numeric(1))
+  c(cvR2_MI_mean = mean(cv_vals), cvR2_MI_sd = stats::sd(cv_vals))
+}
+
 run_alt <- function(x, lab, ys) {
   coefs <- list(); summ <- list()
   for (y in ys) {
@@ -502,13 +566,20 @@ run_alt <- function(x, lab, ys) {
     pm   <- pool_fits(fits)
     r2m  <- mean(vapply(fits, function(f) f$r2, numeric(1)))     # mean R^2 over the imputed data sets
     pm$r2 <- r2m
+    ab   <- pool_aic_bic(fits)                                    # pooled AIC and BIC (mean over imputations)
+    cv   <- pool_cv(y, x, Dlist2, kp)                            # 10-fold CV R^2 (mean and SD over imputations)
     cc   <- fit_lm(y, x, D02); tc <- tidy_fit(cc)
+    cv_cc <- cv10_r2(y, x, D02[kp, ])                            # CV on complete cases (all rows with y observed)
     coefs[[length(coefs) + 1]] <- base::rbind(cbind(outcome = y, model = paste("MI,", lab), pm),
                                               cbind(outcome = y, model = paste("complete case,", lab), tc))
     summ[[length(summ) + 1]] <- data.frame(
       outcome = y, model = lab, predictors = length(x),
       n_MI = fits[[1]]$n, R2_MI = r2m, adjR2_MI = adj_r2(r2m, fits[[1]]$n, fits[[1]]$k),
-      n_cc = cc$n, R2_cc = cc$r2, adjR2_cc = adj_r2(cc$r2, cc$n, cc$k))
+      AIC_MI = ab[["AIC_MI"]], BIC_MI = ab[["BIC_MI"]],
+      cvR2_MI = cv[["cvR2_MI_mean"]], cvR2_MI_sd = cv[["cvR2_MI_sd"]],
+      n_cc = cc$n, R2_cc = cc$r2, adjR2_cc = adj_r2(cc$r2, cc$n, cc$k),
+      AIC_cc = cc$aic, BIC_cc = cc$bic,
+      cvR2_cc = cv_cc$mean, cvR2_cc_sd = cv_cc$sd)
   }
   list(coef = do.call(base::rbind, coefs), summ = do.call(base::rbind, summ))
 }
@@ -519,6 +590,8 @@ for (use_norep in c(FALSE, TRUE)) {
   specs <- c(list(list(x_all(use_norep), paste("2 oblimin + single items (report),", nl), outcomes_all)),
              lapply(alt_k, function(k)
                list(x_k(k, use_norep), paste(k, "oblimin components,", nl), outcomes)),
+             list(list(x_fac3(use_norep), paste("3 oblimin FACTORS + benchmark rest,", nl), outcomes)),
+             list(list(x_fac4(use_norep), paste("4 oblimin FACTORS + benchmark rest,", nl), outcomes)),
              list(list(x_1(use_norep), paste("1 unrotated component,", nl), outcomes_all)))
   for (s in specs) {
     r <- run_alt(s[[1]], s[[2]], s[[3]])
@@ -529,8 +602,12 @@ for (use_norep in c(FALSE, TRUE)) {
 }
 alt_res  <- do.call(base::rbind, lapply(alt_out, function(r) r$coef))
 alt_summ <- do.call(base::rbind, lapply(alt_out, function(r) r$summ))
-cat("\n--- Fit comparison (R^2: mean over imputed data sets / complete cases; use adjusted R^2) ---\n")
-op <- options(width = 200)
+cat("\n--- Fit comparison (MI: mean over imputed data sets; CC: complete cases) ---\n")
+cat("    adjR2: adjusted R^2 (complexity-penalised)\n")
+cat("    AIC/BIC: Gaussian-likelihood criteria averaged over imputed data sets (MI)\n")
+cat("             or on the complete-case model; lower is better\n")
+cat("    cvR2: 10-fold cross-validated R^2 (mean over imputed data sets and its SD)\n\n")
+op <- options(width = 240)
 num <- vapply(alt_summ, base::is.numeric, logical(1))
 alt_print <- alt_summ; alt_print[num] <- lapply(alt_print[num], base::round, 3)
 print(alt_print, row.names = FALSE)
@@ -540,6 +617,8 @@ write.csv(alt_summ, file.path(out_dir, "alt_fit_summary.csv"), row.names = FALSE
 
 cat("\n--- Variance inflation factors, models with NOREP (first imputed data set) ---\n")
 for (k in alt_k) { cat("\n", k, " oblimin components\n", sep = ""); print(vif(Dlist2[[1]], x_k(k, TRUE)), row.names = FALSE) }
+cat("\n3 oblimin FACTORS + benchmark rest\n"); print(vif(Dlist2[[1]], x_fac3(TRUE)), row.names = FALSE)
+cat("\n4 oblimin FACTORS + benchmark rest\n"); print(vif(Dlist2[[1]], x_fac4(TRUE)), row.names = FALSE)
 cat("\n1 unrotated component\n"); print(vif(Dlist2[[1]], x_1(TRUE)), row.names = FALSE)
 
 ## ---- 5. item-level models --------------------------------------------------------
