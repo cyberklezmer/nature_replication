@@ -17,6 +17,9 @@
 ##      sensitivity with a one-component FIELD
 ##   4b. Wald test of FLD1 = FLD2 per outcome (block-wise, MI, complete case); full covariance
 ##      matrix of the estimates, MI pooled by Rubin's rules -> wald_FLD.csv, wald_FLD_rows.tex
+##   4c. alternative component solutions: (a) 3 and 4 oblimin components per predictor group
+##      (outcomes COR1, COR2); (b) one unrotated component per group (outcomes COR0, COR1, COR2);
+##      R^2 comparison with the 2-component model -> alt_models.csv, alt_fit_summary.csv, alt_loadings.csv
 ##   5. item-level models (logistic / proportional odds) as a robustness check
 ##
 ## Outcomes: COR1 (recognition of the crisis), COR2 (severity in one's own field) and,
@@ -408,6 +411,137 @@ rows <- sprintf("%s & %s & %d & %s & %s & %s & %.3f & %.2f & %s \\\\", lab[tab$a
                 fm(tab$FLD1), fm(tab$FLD2), fm(tab$diff), tab$se, tab$F, fmt_p(tab$p))
 writeLines(rows, file.path(out_dir, "wald_FLD_rows.tex"))
 
+## ---- 4c. Alternative component solutions ------------------------------------------
+# (a) 3 and 4 oblimin components per predictor group (FACTORS, FIELD, FREQ, DEM) instead of 2;
+#     outcomes COR1 and COR2 (two oblimin components of CORE, as in the main analysis).
+#     The components replace the 2-component scores AND the single items of these groups
+#     (frek_positiv, gender, top_journal are items of FREQ / DEM and are part of the components).
+#     NOREP has only 3 items and keeps NOR1 + nerep_jaCizi.
+# (b) ONE unrotated component per predictor group (FAC0, FLD0, FRQ0, DEM0; NOR1 is already the
+#     first component of NOREP), no single items; outcomes COR0 (the one-component CORE
+#     description) and, for comparison, COR1 and COR2.
+# Everything else is as in the main joint models: the same imputed items, scores recomputed in
+# every imputed data set (weights fixed from the full-sample solution), rows with originally
+# missing outcome dropped, gender "other" excluded, OLS with HC3, Rubin's rules; models with
+# NOREP use only respondents with observed NOREP items. The 2-component model of the report is
+# refitted with the same code as a benchmark, so that R^2 can be compared on the same rows.
+# The numbering of the components follows the order returned by psych::principal() (largest
+# variance first); check the printed pattern loadings before interpreting them.
+alt_k      <- c(3, 4)
+alt_groups <- c(FACTORS = "FAC", FIELD = "FLD", FREQ = "FRQ", DEM = "DEM")
+
+oblimin_k <- function(g, k) {                   # k oblimin components, largest |loading| positive
+  R   <- res[[g]]$R
+  ob  <- principal(R, nfactors = k, rotate = "oblimin")
+  P   <- unclass(ob$loadings)[, 1:k, drop = FALSE]
+  Wt  <- ob$weights[, 1:k, drop = FALSE]
+  phi <- ob$Phi
+  rownames(P) <- rownames(Wt) <- colnames(R)
+  sg  <- ifelse(apply(P, 2, function(p) p[which.max(abs(p))]) < 0, -1, 1)
+  P   <- sweep(P, 2, sg, "*"); Wt <- sweep(Wt, 2, sg, "*"); phi <- phi * outer(sg, sg)
+  cn  <- paste0("RC", seq_len(k))
+  colnames(P) <- colnames(Wt) <- cn; dimnames(phi) <- list(cn, cn)
+  list(P = P, W = Wt, phi = phi)
+}
+
+cat("\n=== 4c. Alternative component solutions ===\n")
+W_alt <- list(); grp_alt <- character(0); alt_load <- list()
+for (k in alt_k) for (g in names(alt_groups)) {
+  o <- oblimin_k(g, k)
+  cat("\n", g, ": ", k, " oblimin components, pattern loadings (columns = components)\n", sep = "")
+  print(round(o$P, 2))
+  cat("Correlations between the components:\n"); print(round(o$phi, 2))
+  for (j in seq_len(k)) {
+    nm <- paste0(alt_groups[[g]], k, "c", j)
+    W_alt[[nm]] <- o$W[, j]; grp_alt[nm] <- g
+  }
+  alt_load[[length(alt_load) + 1]] <-
+    data.frame(group = g, k = k, component = rep(colnames(o$P), each = nrow(o$P)),
+               variable = rep(rownames(o$P), times = k), pattern = as.vector(o$P),
+               row.names = NULL)
+}
+one_comp <- c(FACTORS = "FAC0", FREQ = "FRQ0", DEM = "DEM0")      # FIELD: FLD0 and NOREP: NOR1 exist
+for (gg in names(one_comp)) {                                       # one unrotated component
+  nm <- one_comp[[gg]]
+  W_alt[[nm]] <- pc1_weights(gg); grp_alt[nm] <- gg
+  pl <- principal(res[[gg]]$R, nfactors = 1, rotate = "none")$loadings[, 1]
+  pl <- pl * ifelse(pl[which.max(abs(pl))] < 0, -1, 1)
+  cat("\n", gg, ": first unrotated component (", nm, "), loadings\n", sep = ""); print(round(pl, 2))
+}
+alt_load <- do.call(base::rbind, alt_load)
+write.csv(alt_load, file.path(out_dir, "alt_loadings.csv"), row.names = FALSE)
+
+make_scores_alt <- function(data, which = names(W_alt)) {
+  sapply(which, function(nm) {
+    g <- grp_alt[[nm]]; ctr <- res[[g]]$pca$center
+    X <- as.matrix(get_items(g, data))[, names(ctr), drop = FALSE]
+    drop(scale(X, center = ctr, scale = res[[g]]$pca$scale) %*% W_alt[[nm]][names(ctr)])
+  })
+}
+S0a  <- make_scores_alt(my.vars)
+ref2 <- list(mean = colMeans(S0a, na.rm = TRUE), sd = apply(S0a, 2, stats::sd, na.rm = TRUE))
+std2 <- function(S) sweep(sweep(S, 2, ref2$mean[colnames(S)]), 2, ref2$sd[colnames(S)], "/")
+D02    <- cbind(D0, as.data.frame(std2(S0a)))
+Dlist2 <- lapply(seq_len(m_imp), function(i)
+  cbind(Dlist[[i]], as.data.frame(std2(make_scores_alt(complete(imp, i))))))
+ok_g     <- !is.na(D0$gender)                    # gender "other" is excluded everywhere
+keep_alt <- function(y) keep_for(y) & ok_g
+stopifnot(!anyNA(W_alt), all(c("FAC0", "FRQ0", "DEM0") %in% names(D02)))
+
+x_k <- function(k, use_norep)                    # all k components of FACTORS, FIELD, FREQ, DEM
+  c(unlist(lapply(alt_groups, function(p) paste0(p, k, "c", seq_len(k))), use.names = FALSE),
+    if (use_norep) c("NOR1", "nerep_jaCizi"))
+x_1 <- function(use_norep) c("FAC0", "FLD0", "FRQ0", "DEM0", if (use_norep) "NOR1")
+
+adj_r2 <- function(r2, n, k) 1 - (1 - r2) * (n - 1) / (n - k)   # k = number of coefficients incl. intercept
+run_alt <- function(x, lab, ys) {
+  coefs <- list(); summ <- list()
+  for (y in ys) {
+    kp   <- keep_alt(y)
+    fits <- lapply(Dlist2, function(d) fit_lm(y, x, d[kp, ]))
+    pm   <- pool_fits(fits)
+    r2m  <- mean(vapply(fits, function(f) f$r2, numeric(1)))     # mean R^2 over the imputed data sets
+    pm$r2 <- r2m
+    cc   <- fit_lm(y, x, D02); tc <- tidy_fit(cc)
+    coefs[[length(coefs) + 1]] <- base::rbind(cbind(outcome = y, model = paste("MI,", lab), pm),
+                                              cbind(outcome = y, model = paste("complete case,", lab), tc))
+    summ[[length(summ) + 1]] <- data.frame(
+      outcome = y, model = lab, predictors = length(x),
+      n_MI = fits[[1]]$n, R2_MI = r2m, adjR2_MI = adj_r2(r2m, fits[[1]]$n, fits[[1]]$k),
+      n_cc = cc$n, R2_cc = cc$r2, adjR2_cc = adj_r2(cc$r2, cc$n, cc$k))
+  }
+  list(coef = do.call(base::rbind, coefs), summ = do.call(base::rbind, summ))
+}
+
+alt_out <- list()
+for (use_norep in c(FALSE, TRUE)) {
+  nl <- if (use_norep) "with NOREP" else "without NOREP"
+  specs <- c(list(list(x_all(use_norep), paste("2 oblimin + single items (report),", nl), outcomes_all)),
+             lapply(alt_k, function(k)
+               list(x_k(k, use_norep), paste(k, "oblimin components,", nl), outcomes)),
+             list(list(x_1(use_norep), paste("1 unrotated component,", nl), outcomes_all)))
+  for (s in specs) {
+    r <- run_alt(s[[1]], s[[2]], s[[3]])
+    alt_out[[length(alt_out) + 1]] <- r
+    cat("\n--- ", s[[2]], " (MI) ---\n", sep = "")
+    show(r$coef[grepl("^MI", r$coef$model), ])
+  }
+}
+alt_res  <- do.call(base::rbind, lapply(alt_out, function(r) r$coef))
+alt_summ <- do.call(base::rbind, lapply(alt_out, function(r) r$summ))
+cat("\n--- Fit comparison (R^2: mean over imputed data sets / complete cases; use adjusted R^2) ---\n")
+op <- options(width = 200)
+num <- vapply(alt_summ, base::is.numeric, logical(1))
+alt_print <- alt_summ; alt_print[num] <- lapply(alt_print[num], base::round, 3)
+print(alt_print, row.names = FALSE)
+options(op)
+write.csv(alt_res,  file.path(out_dir, "alt_models.csv"),      row.names = FALSE)
+write.csv(alt_summ, file.path(out_dir, "alt_fit_summary.csv"), row.names = FALSE)
+
+cat("\n--- Variance inflation factors, models with NOREP (first imputed data set) ---\n")
+for (k in alt_k) { cat("\n", k, " oblimin components\n", sep = ""); print(vif(Dlist2[[1]], x_k(k, TRUE)), row.names = FALSE) }
+cat("\n1 unrotated component\n"); print(vif(Dlist2[[1]], x_1(TRUE)), row.names = FALSE)
+
 ## ---- 5. item-level models --------------------------------------------------------
 cat("\n=== 5. Item-level models (MI): logistic for rep_type, proportional odds otherwise ===\n")
 cat("Estimates are log-odds; OR = exp(estimate). Positive = higher/more serious category.\n")
@@ -442,6 +576,6 @@ if (requireNamespace("ordinal", quietly = TRUE)) {
   }
 }
 
-saveRDS(list(blocks = block_res, joint = joint_res, wald = wald_res, items = item_res,
+saveRDS(list(blocks = block_res, joint = joint_res, wald = wald_res, alt = alt_res, alt_fit = alt_summ, alt_weights = W_alt, items = item_res,
              weights = W, ref = ref), file.path(out_dir, "regression_CORE.rds"))
 cat("\nCSV files and regression_CORE.rds written to '", out_dir, "'.\n", sep = "")
